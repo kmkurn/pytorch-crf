@@ -17,6 +17,49 @@ Install from Github directly:
 
     pip install git+https://github.com/kmkurn/pytorch-crf#egg=pytorch_crf
 
+## Examples
+
+In the examples below, we will assume that these lines have been executed:
+
+    >>> import torch
+    >>> from crf import CRF
+    >>> seq_length, batch_size, num_tags = 3, 2, 5
+    >>> emissions = torch.autograd.Variable(torch.randn(seq_length, batch_size, num_tags))
+    >>> tags = torch.LongTensor([[0, 1], [2, 4], [3, 1]])  # (seq_length, batch_size)
+    >>> model = CRF(num_tags)
+    >>> # Initialize model parameters
+    ... for p in model.parameters():
+    ...    _ = torch.nn.init.uniform(p, -1, 1)
+    ...
+    >>>
+
+### Forward computation
+
+    >>> model(emissions, tags)
+    Variable containing:
+    -10.0635
+    [torch.FloatTensor of size 1]
+
+### Forward computation with mask
+
+    >>> mask = torch.autograd.Variable(torch.ByteTensor([[1, 1], [1, 1], [1, 0]]))  # (seq_length, batch_size)
+    >>> model(emissions, tags, mask=mask)
+    Variable containing:
+    -8.4981
+    [torch.FloatTensor of size 1]
+
+### Decoding
+
+    >>> model.decode(emissions)
+    [[3, 1, 3], [0, 1, 0]]
+
+### Decoding with mask
+
+    >>> model.decode(emissions, mask=mask)
+    [[3, 1, 3], [0, 1, 0]]
+
+See `tests/test_crf.py` for more examples.
+
 ## License
 
 MIT. See LICENSE.md for details.
