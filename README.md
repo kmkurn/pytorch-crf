@@ -13,7 +13,11 @@ This package provides an implementation of [conditional random field](https://en
 
 ## Installation
 
-Install from Github directly:
+You can install with pip
+
+    pip install pytorch-crf
+
+Or, you can install from Github directly
 
     pip install git+https://github.com/kmkurn/pytorch-crf#egg=pytorch_crf
 
