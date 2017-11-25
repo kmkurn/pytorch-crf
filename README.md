@@ -62,7 +62,7 @@ See `tests/test_crf.py` for more examples.
 
 ## License
 
-MIT. See LICENSE.md for details.
+MIT. See LICENSE.txt for details.
 
 ## Contributing
 
