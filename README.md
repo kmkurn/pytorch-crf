@@ -70,9 +70,10 @@ Contributions are welcome! Please follow these instructions to setup dependencie
 
 ### Installing dependencies
 
-Make sure you setup a virtual environment with Python 3.6 and PyTorch installed. Then, install all the dependencies in `requirements.txt` file.
+Make sure you setup a virtual environment with Python 3.6 and PyTorch installed. Then, install all the dependencies in `requirements.txt` file and install this package in development mode.
 
     pip install -r requirements.txt
+    pip install -e .
 
 ### Running tests
 
