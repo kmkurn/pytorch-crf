@@ -1,0 +1,16 @@
+attrs==17.3.0
+certifi==2017.11.5
+cffi==1.10.0
+flake8==3.5.0
+flake8-mypy==17.8.0
+mccabe==0.6.1
+mypy==0.550
+numpy==1.13.3
+psutil==5.4.1
+py==1.5.2
+pycodestyle==2.3.1
+pycparser==2.18
+pyflakes==1.6.0
+pytest==3.2.5
+torch==0.2.0.post4
+typed-ast==1.1.0
