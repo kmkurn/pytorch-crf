@@ -1,12 +1,14 @@
+import os
 from setuptools import setup, find_packages
 
 
-with open('README.md') as f:
+here = os.path.dirname(os.path.realpath(__file__))
+with open(os.path.join(here, 'README.rst')) as f:
     readme = f.read()
 
 
 setup(name='pytorch-crf',
-      version='0.1.1',
+      version='0.2.0',
       description='Conditional random field in PyTorch',
       long_description=readme,
       url='https://github.com/kmkurn/pytorch-crf',
@@ -15,6 +17,7 @@ setup(name='pytorch-crf',
       license='MIT',
       classifiers=[
           'Development Status :: 3 - Alpha',
+          'Intended Audience :: Developers',
           'Intended Audience :: Science/Research',
           'License :: OSI Approved :: MIT License',
           'Programming Language :: Python :: 3',

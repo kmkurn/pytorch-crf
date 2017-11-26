@@ -7,7 +7,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from crf import CRF
+from torchcrf import CRF
 
 
 RANDOM_SEED = 1478754
