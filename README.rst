@@ -6,7 +6,9 @@ Conditional random field in `PyTorch <http://pytorch.org/>`_.
 Description
 ===========
 
-This package provides an implementation of `conditional random field <https://en.wikipedia.org/wiki/Conditional_random_field>`_ (CRF) in PyTorch. This implementation borrows mostly from `AllenNLP CRF module <https://github.com/allenai/allennlp/blob/master/allennlp/modules/conditional_random_field.py>`_ with some modifications, most notably is using PyTorch's fancy indexing instead of ``torch.gather`` and different way of doing Viterbi decoding.
+This package provides an implementation of `conditional random field <https://en.wikipedia.org/wiki/Conditional_random_field>`_ (CRF) in PyTorch. This implementation borrows mostly from `AllenNLP CRF module <https://github.com/allenai/allennlp/blob/master/allennlp/modules/conditional_random_field.py>`_ with some modifications.
+
+NOTE: This software is still in alpha version; every minor version change introduces backward incompatibility.
 
 Requirements
 ============
@@ -33,8 +35,8 @@ In the examples below, we will assume that these lines have been executed ::
     >>> import torch
     >>> from torchcrf import CRF
     >>> seq_length, batch_size, num_tags = 3, 2, 5
-    >>> emissions = torch.autograd.Variable(torch.randn(seq_length, batch_size, num_tags))
-    >>> tags = torch.LongTensor([[0, 1], [2, 4], [3, 1]])  # (seq_length, batch_size)
+    >>> emissions = torch.autograd.Variable(torch.randn(seq_length, batch_size, num_tags), requires_grad=True)
+    >>> tags = torch.autograd.Variable(torch.LongTensor([[0, 1], [2, 4], [3, 1]]))  # (seq_length, batch_size)
     >>> model = CRF(num_tags)
     >>> # Initialize model parameters
     ... for p in model.parameters():

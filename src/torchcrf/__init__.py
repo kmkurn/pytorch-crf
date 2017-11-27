@@ -49,7 +49,7 @@ class CRF(nn.Module):
 
     def forward(self,
                 emissions: Variable,
-                tags: torch.LongTensor,
+                tags: Variable,
                 mask: Optional[Variable] = None,
                 summed: bool = True) -> Variable:
         """Compute the log likelihood of the given sequence of tags and emission score.
@@ -58,10 +58,10 @@ class CRF(nn.Module):
         ---------
         emissions : :class:`~torch.autograd.Variable`
             Emission score tensor of size ``(seq_length, batch_size, num_tags)``.
-        tags : :class:`~torch.LongTensor`
-            Sequence of tags tensor of size ``(seq_length, batch_size)``.
+        tags : :class:`~torch.autograd.Variable`
+            Sequence of tags as ``LongTensor`` of size ``(seq_length, batch_size)``.
         mask : :class:`~torch.autograd.Variable`, optional
-            Mask tensor of size ``(seq_length, batch_size)``.
+            Mask tensor as ``ByteTensor`` of size ``(seq_length, batch_size)``.
         summed : bool
             Whether to sum the log likelihood over the batch.
 
@@ -151,7 +151,7 @@ class CRF(nn.Module):
 
     def _compute_joint_llh(self,
                            emissions: Variable,
-                           tags: torch.LongTensor,
+                           tags: Variable,
                            mask: Variable) -> Variable:
         # emissions: (seq_length, batch_size, num_tags)
         # tags: (seq_length, batch_size)
@@ -163,17 +163,40 @@ class CRF(nn.Module):
         assert all(mask[0].data)
 
         seq_length = emissions.size(0)
+        batch_size = emissions.size(1)
         mask = mask.float()
 
         # Start transition score
         llh = self.start_transitions[tags[0]]  # (batch_size,)
+
+        broadcast_transition = (
+            self.transitions
+            # Add dimension for batch_size
+            .view(1, self.num_tags, self.num_tags)
+            # Copy the transition matrix for all batch
+            .expand(batch_size, self.num_tags, self.num_tags)
+        )
 
         for i in range(seq_length - 1):
             cur_tag, next_tag = tags[i], tags[i+1]
             # Emission score for current tag
             llh += emissions[i].gather(1, cur_tag.view(-1, 1)).squeeze() * mask[i]
             # Transition score to next tag
-            llh += self.transitions[cur_tag, next_tag] * mask[i+1]
+            transition_score = (
+                broadcast_transition
+                # Copy the batch current tag for all possible next tags, and select the current
+                # tag from the transition matrix
+                .gather(1, cur_tag.view(batch_size, 1, 1).expand(batch_size, 1, self.num_tags))
+                # Squeeze to (batch_size, num_tags); this stores the transition score to every
+                # possible next tags for each batch
+                .squeeze()
+                # Select the next tag
+                .gather(1, next_tag.view(batch_size, 1))
+                # Squeeze to (batch_size,)
+                .squeeze()
+            )
+            # Only add transition score if the next tag is not masked (mask == 1)
+            llh += transition_score * mask[i+1]
 
         # Find last tag index
         last_tag_indices = mask.sum(0).long().data - 1  # (batch_size,)
