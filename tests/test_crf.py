@@ -56,6 +56,29 @@ class TestInit(object):
 
 
 class TestForward(object):
+    def test_batched_loss_is_correct(self):
+        seq_length, batch_size, num_tags = 3, 10, 5
+        emissions = torch.autograd.Variable(torch.randn(seq_length, batch_size, num_tags),
+                                            requires_grad=True)
+        tags = torch.autograd.Variable(torch.LongTensor([
+            [random.randrange(num_tags) for b in range(batch_size)]
+            for _ in range(seq_length)
+        ]))
+        crf = CRF(num_tags)
+        initialize(crf)
+
+        llh = crf(emissions, tags)
+
+        assert isinstance(llh, torch.autograd.Variable)
+        assert llh.size() == (1,)
+        total_llh = 0.
+        for i in range(batch_size):
+            emissions_ = emissions[:, i, :].unsqueeze(1)
+            tags_ = tags[:, i].unsqueeze(1)
+            total_llh += crf(emissions_, tags_)
+
+        assert llh.data[0] == approx(total_llh.data[0])
+
     def test_works_with_mask(self):
         seq_length, batch_size, num_tags = 3, 2, 5
         emissions = torch.autograd.Variable(torch.randn(seq_length, batch_size, num_tags),
@@ -75,8 +98,6 @@ class TestForward(object):
 
         llh = crf(emissions, tags, mask=mask)
 
-        assert isinstance(llh, torch.autograd.Variable)
-        assert llh.size() == (1,)
         # Swap seq_length and batch_size, now they're all (batch_size, seq_length, *)
         emissions = emissions.transpose(0, 1)
         tags = tags.transpose(0, 1)
@@ -205,6 +226,19 @@ class TestForward(object):
 
 
 class TestDecode(object):
+    def test_batched_decode_is_correct(self):
+        seq_length, batch_size, num_tags = 3, 10, 5
+        emissions = torch.autograd.Variable(torch.randn(seq_length, batch_size, num_tags))
+        crf = CRF(num_tags)
+        initialize(crf)
+
+        best_tags = crf.decode(emissions)
+
+        assert len(best_tags) == batch_size
+        for i in range(batch_size):
+            emissions_ = emissions[:, i, :].unsqueeze(1)
+            assert best_tags[i] == crf.decode(emissions_)[0]
+
     def test_works_without_mask(self):
         seq_length, batch_size, num_tags = 3, 2, 5
         emissions = torch.autograd.Variable(torch.randn(seq_length, batch_size, num_tags))
@@ -213,7 +247,6 @@ class TestDecode(object):
 
         best_tags = crf.decode(emissions)
 
-        assert len(best_tags) == batch_size
         # Swap seq_length and batch_size
         emissions = emissions.transpose(0, 1)
         # Compute best tag manually
@@ -236,7 +269,6 @@ class TestDecode(object):
 
         best_tags = crf.decode(emissions, mask=mask)
 
-        assert len(best_tags) == batch_size
         # Swap seq_length and batch_size, now they're all (batch_size, seq_length, *)
         emissions = emissions.transpose(0, 1)
         mask = mask.transpose(0, 1)

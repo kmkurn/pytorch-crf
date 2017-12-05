@@ -189,7 +189,7 @@ class CRF(nn.Module):
                 .gather(1, cur_tag.view(batch_size, 1, 1).expand(batch_size, 1, self.num_tags))
                 # Squeeze to (batch_size, num_tags); this stores the transition score to every
                 # possible next tags for each batch
-                .squeeze()
+                .squeeze(1)
                 # Select the next tag
                 .gather(1, next_tag.view(batch_size, 1))
                 # Squeeze to (batch_size,)
