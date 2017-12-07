@@ -95,7 +95,7 @@ class CRF(nn.Module):
                 raise ValueError('mask of the first timestep must all be on')
 
         if mask is None:
-            mask = Variable(self._new(*tags.size()).fill_(1))
+            mask = Variable(self._new(*tags.size()).fill_(1)).byte()
 
         numerator = self._compute_joint_llh(emissions, tags, mask)
         denominator = self._compute_log_partition_function(emissions, mask)
@@ -163,49 +163,28 @@ class CRF(nn.Module):
         assert all(mask[0].data)
 
         seq_length = emissions.size(0)
-        batch_size = emissions.size(1)
         mask = mask.float()
 
         # Start transition score
         llh = self.start_transitions[tags[0]]  # (batch_size,)
 
-        broadcast_transition = (
-            self.transitions
-            # Add dimension for batch_size
-            .view(1, self.num_tags, self.num_tags)
-            # Copy the transition matrix for all batch
-            .expand(batch_size, self.num_tags, self.num_tags)
-        )
-
         for i in range(seq_length - 1):
             cur_tag, next_tag = tags[i], tags[i+1]
             # Emission score for current tag
-            llh += emissions[i].gather(1, cur_tag.view(-1, 1)).squeeze() * mask[i]
+            llh += emissions[i].gather(1, cur_tag.view(-1, 1)).squeeze(1) * mask[i]
             # Transition score to next tag
-            transition_score = (
-                broadcast_transition
-                # Copy the batch current tag for all possible next tags, and select the current
-                # tag from the transition matrix
-                .gather(1, cur_tag.view(batch_size, 1, 1).expand(batch_size, 1, self.num_tags))
-                # Squeeze to (batch_size, num_tags); this stores the transition score to every
-                # possible next tags for each batch
-                .squeeze(1)
-                # Select the next tag
-                .gather(1, next_tag.view(batch_size, 1))
-                # Squeeze to (batch_size,)
-                .squeeze()
-            )
+            transition_score = self.transitions[cur_tag, next_tag]
             # Only add transition score if the next tag is not masked (mask == 1)
             llh += transition_score * mask[i+1]
 
         # Find last tag index
-        last_tag_indices = mask.sum(0).long().data - 1  # (batch_size,)
-        last_tags = tags.gather(0, last_tag_indices.view(1, -1)).squeeze()
+        last_tag_indices = mask.long().sum(0) - 1  # (batch_size,)
+        last_tags = tags.gather(0, last_tag_indices.view(1, -1)).squeeze(0)
 
         # End transition score
         llh += self.end_transitions[last_tags]
         # Emission score for the last tag, if mask is valid (mask == 1)
-        llh += emissions[-1].gather(1, last_tags.view(-1, 1)).squeeze() * mask[-1]
+        llh += emissions[-1].gather(1, last_tags.view(-1, 1)).squeeze(1) * mask[-1]
 
         return llh
 
