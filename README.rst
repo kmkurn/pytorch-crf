@@ -1,6 +1,12 @@
 pytorch-crf
 +++++++++++
 
+.. image:: https://travis-ci.org/kmkurn/pytorch-crf.svg?branch=master
+    :target: https://travis-ci.org/kmkurn/pytorch-crf
+
+.. image:: https://coveralls.io/repos/github/kmkurn/pytorch-crf/badge.svg?branch=enable-travis
+    :target: https://coveralls.io/github/kmkurn/pytorch-crf?branch=enable-travis
+
 Conditional random field in `PyTorch <http://pytorch.org/>`_.
 
 Description
@@ -30,7 +36,9 @@ Or, you can install from Github directly ::
 Examples
 ========
 
-In the examples below, we will assume that these lines have been executed ::
+In the examples below, we will assume that these lines have been executed
+
+.. code-block:: python
 
     >>> import torch
     >>> from torchcrf import CRF
@@ -42,7 +50,7 @@ In the examples below, we will assume that these lines have been executed ::
 Forward computation
 -------------------
 
-::
+.. code-block:: python
 
     >>> model(emissions, tags)
     Variable containing:
@@ -52,7 +60,7 @@ Forward computation
 Forward computation with mask
 -----------------------------
 
-::
+.. code-block:: python
 
     >>> mask = torch.autograd.Variable(torch.ByteTensor([[1, 1], [1, 1], [1, 0]]))  # (seq_length, batch_size)
     >>> model(emissions, tags, mask=mask)
@@ -63,7 +71,7 @@ Forward computation with mask
 Decoding
 --------
 
-::
+.. code-block:: python
 
     >>> model.decode(emissions)
     [[3, 1, 3], [0, 1, 0]]
@@ -71,7 +79,7 @@ Decoding
 Decoding with mask
 ------------------
 
-::
+.. code-block:: python
 
     >>> model.decode(emissions, mask=mask)
     [[3, 1, 3], [0, 1, 0]]
@@ -81,7 +89,7 @@ See ``tests/test_crf.py`` for more examples.
 License
 =======
 
-MIT. See ``LICENSE.txt`` for details.
+MIT. See `LICENSE`_ for details.
 
 Contributing
 ============
@@ -105,3 +113,5 @@ Running linter
 --------------
 
 Run ``flake8`` in the project root directory. This will also run ``mypy``, thanks to ``flake8-mypy`` package.
+
+.. _`LICENSE`: https://github.com/kmkurn/pytorch-crf/blob/enable-travis/LICENSE.txt
