@@ -1,4 +1,5 @@
 from typing import List, Optional, Union
+import warnings
 
 from torch.autograd import Variable
 import torch
@@ -47,11 +48,24 @@ class CRF(nn.Module):
         self.end_transitions = nn.Parameter(torch.Tensor(num_tags))
         self.transitions = nn.Parameter(torch.Tensor(num_tags, num_tags))
 
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        """Initialize the transition parameters.
+
+        The parameters will be initialized randomly from a uniform distribution
+        between -0.1 and 0.1.
+        """
+        nn.init.uniform(self.start_transitions, -0.1, 0.1)
+        nn.init.uniform(self.end_transitions, -0.1, 0.1)
+        nn.init.uniform(self.transitions, -0.1, 0.1)
+
     def forward(self,
                 emissions: Variable,
                 tags: Variable,
                 mask: Optional[Variable] = None,
-                summed: bool = True) -> Variable:
+                reduce: bool = True,
+                **kwargs) -> Variable:
         """Compute the log likelihood of the given sequence of tags and emission score.
 
         Arguments
@@ -62,7 +76,7 @@ class CRF(nn.Module):
             Sequence of tags as ``LongTensor`` of size ``(seq_length, batch_size)``.
         mask : :class:`~torch.autograd.Variable`, optional
             Mask tensor as ``ByteTensor`` of size ``(seq_length, batch_size)``.
-        summed : bool
+        reduce : bool
             Whether to sum the log likelihood over the batch.
 
         Returns
@@ -94,13 +108,23 @@ class CRF(nn.Module):
             if not all(mask[0].data):
                 raise ValueError('mask of the first timestep must all be on')
 
+        if 'summed' in kwargs:
+            msg = "keyword argument 'summed' is deprecated and will be removed in "\
+                  "future versions, please use 'reduce' instead"
+            warnings.warn(msg, DeprecationWarning, stacklevel=3)
+            reduce = kwargs.pop('summed')
+
+        if kwargs:
+            raise TypeError(
+                f"'{kwargs.popitem()[0]}' is an invalid keyword argument for this function")
+
         if mask is None:
             mask = Variable(self._new(*tags.size()).fill_(1)).byte()
 
         numerator = self._compute_joint_llh(emissions, tags, mask)
         denominator = self._compute_log_partition_function(emissions, mask)
         llh = numerator - denominator
-        return torch.sum(llh) if summed else llh
+        return llh if not reduce else torch.sum(llh)
 
     def decode(self,
                emissions: Union[Variable, torch.FloatTensor],

@@ -38,11 +38,6 @@ In the examples below, we will assume that these lines have been executed ::
     >>> emissions = torch.autograd.Variable(torch.randn(seq_length, batch_size, num_tags), requires_grad=True)
     >>> tags = torch.autograd.Variable(torch.LongTensor([[0, 1], [2, 4], [3, 1]]))  # (seq_length, batch_size)
     >>> model = CRF(num_tags)
-    >>> # Initialize model parameters
-    ... for p in model.parameters():
-    ...    _ = torch.nn.init.uniform(p, -1, 1)
-    ...
-    >>>
 
 Forward computation
 -------------------
