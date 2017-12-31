@@ -47,8 +47,8 @@ In the examples below, we will assume that these lines have been executed
     >>> tags = torch.autograd.Variable(torch.LongTensor([[0, 1], [2, 4], [3, 1]]))  # (seq_length, batch_size)
     >>> model = CRF(num_tags)
 
-Forward computation
--------------------
+Computing log likelihood
+------------------------
 
 .. code-block:: python
 
@@ -57,8 +57,8 @@ Forward computation
     -10.0635
     [torch.FloatTensor of size 1]
 
-Forward computation with mask
------------------------------
+Computing log likelihood with mask
+----------------------------------
 
 .. code-block:: python
 
@@ -114,4 +114,4 @@ Running linter
 
 Run ``flake8`` in the project root directory. This will also run ``mypy``, thanks to ``flake8-mypy`` package.
 
-.. _`LICENSE`: https://github.com/kmkurn/pytorch-crf/blob/enable-travis/LICENSE.txt
+.. _`LICENSE`: https://github.com/kmkurn/pytorch-crf/blob/master/LICENSE.txt
