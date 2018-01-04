@@ -1,5 +1,4 @@
 from typing import List, Optional, Union
-import warnings
 
 from torch.autograd import Variable
 import torch
@@ -65,7 +64,7 @@ class CRF(nn.Module):
                 tags: Variable,
                 mask: Optional[Variable] = None,
                 reduce: bool = True,
-                **kwargs) -> Variable:
+                ) -> Variable:
         """Compute the log likelihood of the given sequence of tags and emission score.
 
         Arguments
@@ -108,18 +107,8 @@ class CRF(nn.Module):
             if not all(mask[0].data):
                 raise ValueError('mask of the first timestep must all be on')
 
-        if 'summed' in kwargs:
-            msg = "keyword argument 'summed' is deprecated and will be removed in "\
-                  "future versions, please use 'reduce' instead"
-            warnings.warn(msg, DeprecationWarning, stacklevel=3)
-            reduce = kwargs.pop('summed')
-
-        if kwargs:
-            raise TypeError(
-                f"'{kwargs.popitem()[0]}' is an invalid keyword argument for this function")
-
         if mask is None:
-            mask = Variable(self._new(*tags.size()).fill_(1)).byte()
+            mask = Variable(self._new(tags.size()).fill_(1)).byte()
 
         numerator = self._compute_joint_llh(emissions, tags, mask)
         denominator = self._compute_log_partition_function(emissions, mask)
@@ -159,7 +148,7 @@ class CRF(nn.Module):
         if isinstance(emissions, Variable):
             emissions = emissions.data
         if mask is None:
-            mask = self._new(*emissions.size()[:2]).fill_(1).byte()
+            mask = self._new(emissions.size()[:2]).fill_(1).byte()
         elif isinstance(mask, Variable):
             mask = mask.data
 
@@ -169,7 +158,7 @@ class CRF(nn.Module):
 
         best_tags = []
         for emission, mask_ in zip(emissions, mask):
-            seq_length = mask_.sum()
+            seq_length = mask_.long().sum()
             best_tags.append(self._viterbi_decode(emission[:seq_length]))
         return best_tags
 

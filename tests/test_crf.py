@@ -214,27 +214,6 @@ class TestForward(object):
             crf(emissions, tags, mask=mask)
         assert 'mask of the first timestep must all be on' in str(excinfo.value)
 
-    def test_warning_when_kwarg_summed_is_used(self, recwarn):
-        crf = make_crf()
-        emissions = make_emissions(num_tags=crf.num_tags)
-        tags = make_tags(num_tags=crf.num_tags)
-
-        crf(emissions, tags, summed=False)
-
-        w = recwarn.pop(DeprecationWarning)
-        msg = "keyword argument 'summed' is deprecated and will be removed in "\
-              "future versions, please use 'reduce' instead"
-        assert msg in str(w.message)
-
-    def test_unknown_kwargs(self):
-        crf = make_crf()
-        emissions = make_emissions(num_tags=crf.num_tags)
-        tags = make_tags(num_tags=crf.num_tags)
-
-        with pytest.raises(TypeError) as excinfo:
-            crf(emissions, tags, foo='foo')
-        assert "'foo' is an invalid keyword argument for this function" in str(excinfo.value)
-
 
 class TestDecode(object):
     def test_batched_decode_is_correct(self):

@@ -14,8 +14,6 @@ Description
 
 This package provides an implementation of `conditional random field <https://en.wikipedia.org/wiki/Conditional_random_field>`_ (CRF) in PyTorch. This implementation borrows mostly from `AllenNLP CRF module <https://github.com/allenai/allennlp/blob/master/allennlp/modules/conditional_random_field.py>`_ with some modifications.
 
-NOTE: This software is still in alpha version; every minor version change introduces backward incompatibility.
-
 Requirements
 ============
 
