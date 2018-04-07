@@ -1,11 +1,17 @@
 pytorch-crf
 +++++++++++
 
+.. image:: https://badge.fury.io/py/pytorch-crf.svg
+   :target: https://badge.fury.io/py/pytorch-crf
+
 .. image:: https://travis-ci.org/kmkurn/pytorch-crf.svg?branch=master
-    :target: https://travis-ci.org/kmkurn/pytorch-crf
+   :target: https://travis-ci.org/kmkurn/pytorch-crf
 
 .. image:: https://coveralls.io/repos/github/kmkurn/pytorch-crf/badge.svg?branch=enable-travis
-    :target: https://coveralls.io/github/kmkurn/pytorch-crf?branch=enable-travis
+   :target: https://coveralls.io/github/kmkurn/pytorch-crf?branch=enable-travis
+
+.. image:: https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg
+   :target: http://spacemacs.org
 
 Conditional random field in `PyTorch <http://pytorch.org/>`_.
 
@@ -80,7 +86,7 @@ Decoding with mask
 .. code-block:: python
 
     >>> model.decode(emissions, mask=mask)
-    [[3, 1, 3], [0, 1, 0]]
+    [[3, 1, 3], [0, 1]]
 
 See ``tests/test_crf.py`` for more examples.
 
