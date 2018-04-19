@@ -81,7 +81,7 @@ class CRF(nn.Module):
         Returns
         -------
         :class:`~torch.autograd.Variable`
-            The log likelihood. This will have size (1,) if ``summed=True``, ``(batch_size,)``
+            The log likelihood. This will have size (1,) if ``reduce=True``, ``(batch_size,)``
             otherwise.
         """
         if emissions.dim() != 3:
