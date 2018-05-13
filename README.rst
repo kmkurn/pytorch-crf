@@ -7,8 +7,8 @@ pytorch-crf
 .. image:: https://travis-ci.org/kmkurn/pytorch-crf.svg?branch=master
    :target: https://travis-ci.org/kmkurn/pytorch-crf
 
-.. image:: https://coveralls.io/repos/github/kmkurn/pytorch-crf/badge.svg?branch=enable-travis
-   :target: https://coveralls.io/github/kmkurn/pytorch-crf?branch=enable-travis
+.. image:: https://coveralls.io/repos/github/kmkurn/pytorch-crf/badge.svg?branch=master
+   :target: https://coveralls.io/github/kmkurn/pytorch-crf?branch=master
 
 .. image:: https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg
    :target: http://spacemacs.org
