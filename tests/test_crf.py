@@ -58,6 +58,7 @@ class TestInit(object):
         assert crf.end_transitions.size() == (num_tags,)
         assert isinstance(crf.transitions, nn.Parameter)
         assert crf.transitions.size() == (num_tags, num_tags)
+        assert repr(crf) == f'CRF(num_tags={num_tags})'
 
     def test_nonpositive_num_tags(self):
         with pytest.raises(ValueError) as excinfo:

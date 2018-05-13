@@ -59,6 +59,9 @@ class CRF(nn.Module):
         nn.init.uniform(self.end_transitions, -0.1, 0.1)
         nn.init.uniform(self.transitions, -0.1, 0.1)
 
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(num_tags={self.num_tags})'
+
     def forward(self,
                 emissions: Variable,
                 tags: Variable,
