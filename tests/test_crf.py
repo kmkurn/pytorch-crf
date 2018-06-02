@@ -205,6 +205,19 @@ class TestForward(object):
             excinfo.value
         )
 
+    def test_intialize_parameters(self):
+        emissions = torch.autograd.Variable(torch.randn(2, 2, 3), requires_grad=True)
+        tags = torch.autograd.Variable(torch.LongTensor([[2, 1], [2, 1]]))
+        mask = torch.autograd.Variable(torch.ByteTensor([[1, 1], [1, 0]]))
+        crf = CRF(3)
+        llh = float(crf(emissions, tags, mask))
+        crf_other = CRF(3)
+        crf_other.initialize_parameters(crf.start_transitions.data,
+                                        crf.end_transitions.data,
+                                        crf.transitions.data)
+        llh_other = float(crf_other(emissions, tags, mask))
+        assert llh == llh_other
+
     def test_first_timestep_mask_is_not_all_on(self):
         emissions = torch.autograd.Variable(torch.randn(1, 2, 3), requires_grad=True)
         tags = torch.autograd.Variable(torch.LongTensor(1, 2))
