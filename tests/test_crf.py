@@ -34,9 +34,11 @@ def make_crf(num_tags=5):
     return CRF(num_tags)
 
 
-def make_emissions(seq_length=3, batch_size=2, num_tags=5):
-    return torch.autograd.Variable(torch.randn(seq_length, batch_size, num_tags),
-                                   requires_grad=True)
+def make_emissions(seq_length=3, batch_size=2, num_tags=5, use_gpu=False):
+    emissions = torch.randn(seq_length, batch_size, num_tags)
+    if use_gpu:
+        emissions = emissions.cuda()
+    return torch.autograd.Variable(emissions, requires_grad=True)
 
 
 def make_tags(seq_length=3, batch_size=2, num_tags=5):
@@ -227,6 +229,26 @@ class TestForward(object):
         with pytest.raises(ValueError) as excinfo:
             crf(emissions, tags, mask=mask)
         assert 'mask of the first timestep must all be on' in str(excinfo.value)
+
+    def test_gpu_equivalent_to_cpu(self):
+        if torch.cuda.is_available():
+            emissions = make_emissions(2, 2, 5)
+            emissions_gpu = make_emissions(2, 2, 5, use_gpu=True)
+            tags = torch.autograd.Variable(torch.LongTensor([[2, 3], [1, 3]]))
+            tags_gpu = torch.autograd.Variable(torch.LongTensor([[2, 3], [1, 3]]).cuda())
+            mask = torch.autograd.Variable(torch.ByteTensor([[1, 1], [1, 0]]))
+            mask_gpu = torch.autograd.Variable(torch.ByteTensor([[1, 1], [1, 0]]).cuda())
+            crf = CRF(5)
+            llh = crf(emissions, tags, mask=mask)
+            crf_gpu = CRF(5, use_gpu=True)
+            llh_gpu = crf_gpu(emissions_gpu, tags_gpu, mask=mask_gpu)
+            assert llh.shape[0] == 1
+            assert llh_gpu.shape[0] == 1
+            decode = crf.decode(emissions, mask=mask)
+            decode_gpu = crf_gpu.decode(emissions_gpu, mask=mask_gpu)
+            assert len(decode) == len(decode)
+            assert len(decode[0]) == len(decode_gpu[0])
+            assert len(decode[1]) == len(decode_gpu[1])
 
 
 class TestDecode(object):
