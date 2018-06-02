@@ -51,17 +51,30 @@ class CRF(nn.Module):
             self.start_transitions = nn.Parameter(torch.Tensor(num_tags))
             self.end_transitions = nn.Parameter(torch.Tensor(num_tags))
             self.transitions = nn.Parameter(torch.Tensor(num_tags, num_tags))
-        self.reset_parameters()
 
-    def reset_parameters(self) -> None:
+        self.initialize_parameters()
+
+    def initialize_parameters(self,
+                              start_transitions=None,
+                              end_transitions=None,
+                              transitions=None) -> None:
         """Initialize the transition parameters.
 
         The parameters will be initialized randomly from a uniform distribution
-        between -0.1 and 0.1.
+        between -0.1 and 0.1, unless given explicitly as an argument.
         """
-        nn.init.uniform(self.start_transitions, -0.1, 0.1)
-        nn.init.uniform(self.end_transitions, -0.1, 0.1)
-        nn.init.uniform(self.transitions, -0.1, 0.1)
+        if start_transitions is None:
+            nn.init.uniform(self.start_transitions, -0.1, 0.1)
+        else:
+            self.start_transitions.data = start_transitions
+        if end_transitions is None:
+            nn.init.uniform(self.end_transitions, -0.1, 0.1)
+        else:
+            self.end_transitions.data = end_transitions
+        if transitions is None:
+            nn.init.uniform(self.transitions, -0.1, 0.1)
+        else:
+            self.transitions.data = transitions
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(num_tags={self.num_tags})'
@@ -159,15 +172,7 @@ class CRF(nn.Module):
         elif isinstance(mask, Variable):
             mask = mask.data
 
-        # Transpose batch_size and seq_length
-        emissions = emissions.transpose(0, 1)
-        mask = mask.transpose(0, 1)
-
-        best_tags = []
-        for emission, mask_ in zip(emissions, mask):
-            seq_length = mask_.long().sum()
-            best_tags.append(self._viterbi_decode(emission[:seq_length]))
-        return best_tags
+        return self._viterbi_decode(emissions, mask)
 
     def _compute_joint_llh(self,
                            emissions: Variable,
@@ -248,54 +253,64 @@ class CRF(nn.Module):
         # Sum (log-sum-exp) over all possible tags
         return self._log_sum_exp(log_prob, 1)  # (batch_size,)
 
-    def _viterbi_decode(self, emission: torch.FloatTensor) -> List[int]:
-        # emission: (seq_length, num_tags)
-        assert emission.size(1) == self.num_tags
+    def _viterbi_decode(self, emissions: torch.FloatTensor, mask: torch.ByteTensor) \
+            -> List[List[int]]:
+        # Get input sizes
+        max_sequence_length = emissions.shape[0]
+        minibatch_size = emissions.shape[1]
+        sequence_lengths = mask.long().sum(dim=0)
 
-        seq_length = emission.size(0)
+        # emissions: (seq_length, batch_size, num_tags)
+        assert emissions.shape[2] == self.num_tags
+
+        # list to store the decoded paths
+        best_tags_list = []
 
         # Start transition
-        viterbi_score = self.start_transitions.data + emission[0]
+        viterbi_score = []
+        viterbi_score.append(self.start_transitions.data + emissions[0])
         viterbi_path = []
-        # Here, viterbi_score has shape of (num_tags,) where value at index i stores
+
+        # Here, viterbi_score is a list of shapes of (num_tags,) where value at index i stores
         # the score of the best tag sequence so far that ends with tag i
         # viterbi_path saves where the best tags candidate transitioned from; this is used
         # when we trace back the best tag sequence
 
         # Viterbi algorithm recursive case: we compute the score of the best tag sequence
         # for every possible next tag
-        for i in range(1, seq_length):
+        for i in range(1, max_sequence_length):
             # Broadcast viterbi score for every possible next tag
-            broadcast_score = viterbi_score.view(-1, 1)
+            broadcast_score = viterbi_score[i - 1].view(minibatch_size, -1, 1)
             # Broadcast emission score for every possible current tag
-            broadcast_emission = emission[i].view(1, -1)
+            broadcast_emission = emissions[i].view(minibatch_size, 1, -1)
             # Compute the score matrix of shape (num_tags, num_tags) where each entry at
             # row i and column j stores the score of transitioning from tag i to tag j
             # and emitting
             score = broadcast_score + self.transitions.data + broadcast_emission
             # Find the maximum score over all possible current tag
-            best_score, best_path = score.max(0)  # (num_tags,)
+            best_score, best_path = score.max(1)  # (minibatch_size,num_tags,)
             # Save the score and the path
-            viterbi_score = best_score
+            viterbi_score.append(best_score)
             viterbi_path.append(best_path)
 
-        # End transition
-        viterbi_score += self.end_transitions.data
+        # Now, compute the best path for each sample
+        for idx in range(minibatch_size):
+            # Find the tag which maximizes the score at the last timestep; this is our best tag
+            # for the last timestep
+            seq_end = sequence_lengths[idx]-1
+            _, best_last_tag = (viterbi_score[seq_end][idx] + self.end_transitions.data).max(0)
+            best_tags = [best_last_tag[0]]
 
-        # Find the tag which maximizes the score at the last timestep; this is our best tag
-        # for the last timestep
-        _, best_last_tag = viterbi_score.max(0)
-        best_tags = [best_last_tag[0]]
+            # We trace back where the best last tag comes from, append that to our best tag
+            # sequence, and trace it back again, and so on
+            for path in reversed(viterbi_path[:sequence_lengths[idx] - 1]):
+                best_last_tag = path[idx][best_tags[-1]]
+                best_tags.append(best_last_tag)
 
-        # We trace back where the best last tag comes from, append that to our best tag
-        # sequence, and trace it back again, and so on
-        for path in reversed(viterbi_path):
-            best_last_tag = path[best_tags[-1]]
-            best_tags.append(best_last_tag)
-
-        # Reverse the order because we start from the last timestep
-        best_tags.reverse()
-        return best_tags
+            # Reverse the order because we start from the last timestep
+            best_tags.reverse()
+            best_tags_list.append(best_tags)
+        return best_tags_list
 
     @staticmethod
     def _log_sum_exp(tensor: Variable, dim: int) -> Variable:
