@@ -38,15 +38,19 @@ class CRF(nn.Module):
 
     .. _Viterbi algorithm: https://en.wikipedia.org/wiki/Viterbi_algorithm
     """
-    def __init__(self, num_tags: int) -> None:
+    def __init__(self, num_tags: int, use_gpu=False) -> None:
         if num_tags <= 0:
             raise ValueError(f'invalid number of tags: {num_tags}')
         super().__init__()
         self.num_tags = num_tags
-        self.start_transitions = nn.Parameter(torch.Tensor(num_tags))
-        self.end_transitions = nn.Parameter(torch.Tensor(num_tags))
-        self.transitions = nn.Parameter(torch.Tensor(num_tags, num_tags))
-
+        if use_gpu:
+            self.start_transitions = nn.Parameter(torch.Tensor(num_tags).cuda())
+            self.end_transitions = nn.Parameter(torch.Tensor(num_tags).cuda())
+            self.transitions = nn.Parameter(torch.Tensor(num_tags, num_tags).cuda())
+        else:
+            self.start_transitions = nn.Parameter(torch.Tensor(num_tags))
+            self.end_transitions = nn.Parameter(torch.Tensor(num_tags))
+            self.transitions = nn.Parameter(torch.Tensor(num_tags, num_tags))
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
