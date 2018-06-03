@@ -49,15 +49,30 @@ class CRF(nn.Module):
 
         self.reset_parameters()
 
-    def reset_parameters(self) -> None:
+    def initialize_parameters(self,
+                              start_transitions=None,
+                              end_transitions=None,
+                              transitions=None) -> None:
         """Initialize the transition parameters.
 
         The parameters will be initialized randomly from a uniform distribution
-        between -0.1 and 0.1.
+        between -0.1 and 0.1, unless given explicitly as an argument.
         """
-        nn.init.uniform(self.start_transitions, -0.1, 0.1)
-        nn.init.uniform(self.end_transitions, -0.1, 0.1)
-        nn.init.uniform(self.transitions, -0.1, 0.1)
+        if start_transitions is None:
+            nn.init.uniform(self.start_transitions, -0.1, 0.1)
+        else:
+            self.start_transitions.data = start_transitions
+        if end_transitions is None:
+            nn.init.uniform(self.end_transitions, -0.1, 0.1)
+        else:
+            self.end_transitions.data = end_transitions
+        if transitions is None:
+            nn.init.uniform(self.transitions, -0.1, 0.1)
+        else:
+            self.transitions.data = transitions
+
+    def reset_parameters(self):
+        self.initialize_parameters()
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(num_tags={self.num_tags})'
