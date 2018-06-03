@@ -47,7 +47,7 @@ class CRF(nn.Module):
         self.end_transitions = nn.Parameter(torch.Tensor(num_tags))
         self.transitions = nn.Parameter(torch.Tensor(num_tags, num_tags))
 
-        self.initialize_parameters()
+        self.reset_parameters()
 
     def initialize_parameters(self,
                               start_transitions=None,
@@ -70,6 +70,9 @@ class CRF(nn.Module):
             nn.init.uniform(self.transitions, -0.1, 0.1)
         else:
             self.transitions.data = transitions
+
+    def reset_parameters(self):
+        self.initialize_parameters()
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(num_tags={self.num_tags})'
