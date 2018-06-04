@@ -312,3 +312,23 @@ class TestDecode(object):
             crf.decode(emissions, mask=mask)
         assert ('the first two dimensions of emissions and mask must match, '
                 'got (1, 2) and (2, 2)') in str(excinfo.value)
+
+    def test_batched_decode(self):
+        batch_size, seq_len, num_tags = 2, 3, 4
+        crf = CRF(num_tags)
+        emissions = torch.randn(seq_len, batch_size, num_tags)
+        mask = torch.ByteTensor([[1, 1, 1], [1, 1, 0]]).transpose(0, 1)
+
+        # non-batched
+        non_batched = []
+        for emissions_, mask_ in zip(emissions.transpose(0, 1), mask.transpose(0, 1)):
+            emissions_ = emissions_.unsqueeze(1)  # shape: (seq_len, 1, num_tags)
+            mask_ = mask_.unsqueeze(1)  # shape: (seq_len, 1)
+            result = crf.decode(emissions_, mask=mask_)
+            assert len(result) == 1
+            non_batched.append(result[0])
+
+        # batched
+        batched = crf.decode(emissions, mask=mask)
+
+        assert non_batched == batched
