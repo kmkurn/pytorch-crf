@@ -204,9 +204,9 @@ class CRF(nn.Module):
 
         return llh
 
-    def _compute_log_partition_function(self,
-                                        emissions: Variable,
-                                        mask: Variable) -> Variable:
+    def _compute_log_alpha(self,
+                           emissions: Variable,
+                           mask: Variable) -> Variable:
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and mask.dim() == 2
@@ -218,13 +218,13 @@ class CRF(nn.Module):
         mask = mask.float()
 
         # Start transition score and first emission
-        log_prob = self.start_transitions.view(1, -1) + emissions[0]
+        log_prob = [self.start_transitions.view(1, -1) + emissions[0]]
         # Here, log_prob has size (batch_size, num_tags) where for each batch,
         # the j-th column stores the log probability that the current timestep has tag j
 
         for i in range(1, seq_length):
             # Broadcast log_prob over all possible next tags
-            broadcast_log_prob = log_prob.unsqueeze(2)  # (batch_size, num_tags, 1)
+            broadcast_log_prob = log_prob[i-1].unsqueeze(2)  # (batch_size, num_tags, 1)
             # Broadcast transition score over all instances in the batch
             broadcast_transitions = self.transitions.unsqueeze(0)  # (1, num_tags, num_tags)
             # Broadcast emission score over all possible current tags
@@ -237,12 +237,18 @@ class CRF(nn.Module):
             score = self._log_sum_exp(score, 1)  # (batch_size, num_tags)
             # Set log_prob to the score if this timestep is valid (mask == 1), otherwise
             # leave it alone
-            log_prob = score * mask[i].unsqueeze(1) + log_prob * (1.-mask[i]).unsqueeze(1)
+            log_prob.append(score * mask[i].unsqueeze(1) + log_prob[i-1] * (1.-mask[i]).unsqueeze(1))
 
         # End transition score
-        log_prob += self.end_transitions.view(1, -1)
-        # Sum (log-sum-exp) over all possible tags
-        return self._log_sum_exp(log_prob, 1)  # (batch_size,)
+        log_prob[len(log_prob)-1] += self.end_transitions.view(1, -1)
+        return log_prob
+
+    def _compute_log_partition_function(self,
+                                        emissions: Variable,
+                                        mask: Variable) -> Variable:
+        alpha = self._compute_log_alpha(emissions, mask)
+        # Sum (log-sum-exp) over all possible tags at the last time stamp
+        return self._log_sum_exp(alpha[len(alpha)-1], 1)  # (batch_size,)
 
     def _viterbi_decode(self, emission: torch.FloatTensor) -> List[int]:
         # emission: (seq_length, num_tags)
