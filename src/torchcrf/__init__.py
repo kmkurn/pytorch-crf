@@ -277,7 +277,7 @@ class CRF(nn.Module):
             log_prob.append(score * mask[seq_length-i-1].unsqueeze(1) + log_prob[i-1] * (1.-mask[seq_length-i-1]).unsqueeze(1))
 
         # End transition score
-        log_prob[0] += self.start_transitions.view(1, -1)
+        log_prob[len(log_prob)-1] += self.start_transitions.view(1, -1)
 
         log_prob.reverse()
 
@@ -286,9 +286,9 @@ class CRF(nn.Module):
     def compute_log_marginal_probabilities(self, emissions: Variable, mask: Variable) -> Variable:
         alpha = self._compute_log_alpha(emissions,mask)
         beta = self._compute_log_beta(emissions,mask)
-        z = self._compute_log_partition_function(emissions,mask)
+        z = self._log_sum_exp(alpha[alpha.size(0)-1], 1)
 
-        prob = alpha + beta - z.view(1,-1,1)
+        prob = alpha + beta #- z.view(1,-1,1)
         return prob
 
     def _viterbi_decode(self, emissions: torch.FloatTensor, mask: torch.ByteTensor) \
