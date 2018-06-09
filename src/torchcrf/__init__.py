@@ -239,12 +239,12 @@ class CRF(nn.Module):
     def _viterbi_decode(self, emissions: torch.FloatTensor, mask: torch.ByteTensor) \
             -> List[List[int]]:
         # Get input sizes
-        max_sequence_length = emissions.shape[0]
-        minibatch_size = emissions.shape[1]
+        seq_length = emissions.size(0)
+        batch_size = emissions.size(1)
         sequence_lengths = mask.long().sum(dim=0)
 
         # emissions: (seq_length, batch_size, num_tags)
-        assert emissions.shape[2] == self.num_tags
+        assert emissions.size(2) == self.num_tags
 
         # list to store the decoded paths
         best_tags_list = []
@@ -254,30 +254,30 @@ class CRF(nn.Module):
         viterbi_score.append(self.start_transitions.data + emissions[0])
         viterbi_path = []
 
-        # Here, viterbi_score is a list of shapes of (num_tags,) where value at index i stores
-        # the score of the best tag sequence so far that ends with tag i
+        # Here, viterbi_score is a list of tensors of shapes of (num_tags,) where value at
+        # index i stores the score of the best tag sequence so far that ends with tag i
         # viterbi_path saves where the best tags candidate transitioned from; this is used
         # when we trace back the best tag sequence
 
         # Viterbi algorithm recursive case: we compute the score of the best tag sequence
         # for every possible next tag
-        for i in range(1, max_sequence_length):
+        for i in range(1, seq_length):
             # Broadcast viterbi score for every possible next tag
-            broadcast_score = viterbi_score[i - 1].view(minibatch_size, -1, 1)
+            broadcast_score = viterbi_score[i - 1].view(batch_size, -1, 1)
             # Broadcast emission score for every possible current tag
-            broadcast_emission = emissions[i].view(minibatch_size, 1, -1)
-            # Compute the score matrix of shape (num_tags, num_tags) where each entry at
-            # row i and column j stores the score of transitioning from tag i to tag j
-            # and emitting
+            broadcast_emission = emissions[i].view(batch_size, 1, -1)
+            # Compute the score matrix of shape (batch_size, num_tags, num_tags) where
+            # for each sample, each entry at row i and column j stores the score of
+            # transitioning from tag i to tag j and emitting
             score = broadcast_score + self.transitions.data + broadcast_emission
             # Find the maximum score over all possible current tag
-            best_score, best_path = score.max(1)  # (minibatch_size,num_tags,)
+            best_score, best_path = score.max(1)  # (batch_size,num_tags,)
             # Save the score and the path
             viterbi_score.append(best_score)
             viterbi_path.append(best_path)
 
         # Now, compute the best path for each sample
-        for idx in range(minibatch_size):
+        for idx in range(batch_size):
             # Find the tag which maximizes the score at the last timestep; this is our best tag
             # for the last timestep
             seq_end = sequence_lengths[idx]-1
