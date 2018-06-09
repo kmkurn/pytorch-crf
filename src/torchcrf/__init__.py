@@ -4,7 +4,6 @@ from torch.autograd import Variable
 import torch
 import torch.nn as nn
 
-
 class CRF(nn.Module):
     """Conditional random field.
 
@@ -155,15 +154,7 @@ class CRF(nn.Module):
         elif isinstance(mask, Variable):
             mask = mask.data
 
-        # Transpose batch_size and seq_length
-        emissions = emissions.transpose(0, 1)
-        mask = mask.transpose(0, 1)
-
-        best_tags = []
-        for emission, mask_ in zip(emissions, mask):
-            seq_length = mask_.long().sum()
-            best_tags.append(self._viterbi_decode(emission[:seq_length]))
-        return best_tags
+        return self._viterbi_decode(emissions, mask)
 
     def _compute_joint_llh(self,
                            emissions: Variable,
@@ -204,9 +195,9 @@ class CRF(nn.Module):
 
         return llh
 
-    def _compute_log_partition_function(self,
-                                        emissions: Variable,
-                                        mask: Variable) -> Variable:
+    def _compute_log_alpha(self,
+                           emissions: Variable,
+                           mask: Variable) -> Variable:
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and mask.dim() == 2
@@ -218,13 +209,13 @@ class CRF(nn.Module):
         mask = mask.float()
 
         # Start transition score and first emission
-        log_prob = self.start_transitions.view(1, -1) + emissions[0]
+        log_prob = [self.start_transitions.view(1, -1) + emissions[0]]
         # Here, log_prob has size (batch_size, num_tags) where for each batch,
         # the j-th column stores the log probability that the current timestep has tag j
 
         for i in range(1, seq_length):
             # Broadcast log_prob over all possible next tags
-            broadcast_log_prob = log_prob.unsqueeze(2)  # (batch_size, num_tags, 1)
+            broadcast_log_prob = log_prob[i-1].unsqueeze(2)  # (batch_size, num_tags, 1)
             # Broadcast transition score over all instances in the batch
             broadcast_transitions = self.transitions.unsqueeze(0)  # (1, num_tags, num_tags)
             # Broadcast emission score over all possible current tags
@@ -237,61 +228,128 @@ class CRF(nn.Module):
             score = self._log_sum_exp(score, 1)  # (batch_size, num_tags)
             # Set log_prob to the score if this timestep is valid (mask == 1), otherwise
             # leave it alone
-            log_prob = score * mask[i].unsqueeze(1) + log_prob * (1.-mask[i]).unsqueeze(1)
+            log_prob.append(score * mask[i].unsqueeze(1) + log_prob[i-1] * (1.-mask[i]).unsqueeze(1))
 
         # End transition score
-        log_prob += self.end_transitions.view(1, -1)
-        # Sum (log-sum-exp) over all possible tags
-        return self._log_sum_exp(log_prob, 1)  # (batch_size,)
+        log_prob[len(log_prob)-1] += self.end_transitions.view(1, -1)
+        return torch.stack(log_prob)
 
-    def _viterbi_decode(self, emission: torch.FloatTensor) -> List[int]:
-        # emission: (seq_length, num_tags)
-        assert emission.size(1) == self.num_tags
+    def _compute_log_partition_function(self,
+                                        emissions: Variable,
+                                        mask: Variable) -> Variable:
+        alpha = self._compute_log_alpha(emissions, mask)
+        # Sum (log-sum-exp) over all possible tags at the last time stamp
+        return self._log_sum_exp(alpha[alpha.size(0)-1], 1)  # (batch_size,)
 
-        seq_length = emission.size(0)
+    def _compute_log_beta(self,
+                          emissions: Variable,
+                          mask: Variable) -> Variable:
+        # emissions: (seq_length, batch_size, num_tags)
+        # mask: (seq_length, batch_size)
+        assert emissions.dim() == 3 and mask.dim() == 2
+        assert emissions.size()[:2] == mask.size()
+        assert emissions.size(2) == self.num_tags
+        assert all(mask[0].data)
+
+        seq_length = emissions.size(0)
+        mask = mask.float()
+
+        # End transition score and last emission
+        log_prob = [self.end_transitions.view(1, -1) + emissions[seq_length-1]]
+        # Here, log_prob has size (batch_size, num_tags) where for each batch,
+        # the j-th column stores the log probability that the current timestep has tag j
+
+        for i in range(1, seq_length):
+            # Broadcast log_prob over all possible next tags
+            broadcast_log_prob = log_prob[i-1].unsqueeze(2)  # (batch_size, num_tags, 1)
+            # Broadcast transition score over all instances in the batch
+            broadcast_transitions = self.transitions.transpose(0,1).unsqueeze(0)  # (1, num_tags, num_tags)
+            # Broadcast emission score over all possible current tags
+            broadcast_emissions = emissions[seq_length-i-1].unsqueeze(1)  # (batch_size, 1, num_tags)
+            # Sum current log probability, transition, and emission scores
+            score = broadcast_log_prob + broadcast_transitions \
+                + broadcast_emissions  # (batch_size, num_tags, num_tags)
+            # Sum over all possible current tags, but we're in log prob space, so a sum
+            # becomes a log-sum-exp
+            score = self._log_sum_exp(score, 1)  # (batch_size, num_tags)
+            # Set log_prob to the score if this timestep is valid (mask == 1), otherwise
+            # leave it alone
+            log_prob.append(score * mask[seq_length-i-1].unsqueeze(1) + log_prob[i-1] * (1.-mask[seq_length-i-1]).unsqueeze(1))
+
+        # End transition score
+        log_prob[len(log_prob)-1] += self.start_transitions.view(1, -1)
+
+        log_prob.reverse()
+
+        return torch.stack(log_prob)
+
+    def compute_log_marginal_probabilities(self, emissions: Variable, mask: Variable) -> Variable:
+        alpha = self._compute_log_alpha(emissions,mask)
+        beta = self._compute_log_beta(emissions,mask)
+        z = self._log_sum_exp(alpha[alpha.size(0)-1], 1)
+
+        prob = alpha + beta - z.view(1,-1,1)
+        s = torch.nn.Softmax(dim=2)
+        return s(prob)
+
+    def _viterbi_decode(self, emissions: torch.FloatTensor, mask: torch.ByteTensor) \
+            -> List[List[int]]:
+        # Get input sizes
+        max_sequence_length = emissions.shape[0]
+        minibatch_size = emissions.shape[1]
+        sequence_lengths = mask.long().sum(dim=0)
+
+        # emissions: (seq_length, batch_size, num_tags)
+        assert emissions.shape[2] == self.num_tags
+
+        # list to store the decoded paths
+        best_tags_list = []
 
         # Start transition
-        viterbi_score = self.start_transitions.data + emission[0]
+        viterbi_score = []
+        viterbi_score.append(self.start_transitions.data + emissions[0])
         viterbi_path = []
-        # Here, viterbi_score has shape of (num_tags,) where value at index i stores
+
+        # Here, viterbi_score is a list of shapes of (num_tags,) where value at index i stores
         # the score of the best tag sequence so far that ends with tag i
         # viterbi_path saves where the best tags candidate transitioned from; this is used
         # when we trace back the best tag sequence
 
         # Viterbi algorithm recursive case: we compute the score of the best tag sequence
         # for every possible next tag
-        for i in range(1, seq_length):
+        for i in range(1, max_sequence_length):
             # Broadcast viterbi score for every possible next tag
-            broadcast_score = viterbi_score.view(-1, 1)
+            broadcast_score = viterbi_score[i - 1].view(minibatch_size, -1, 1)
             # Broadcast emission score for every possible current tag
-            broadcast_emission = emission[i].view(1, -1)
+            broadcast_emission = emissions[i].view(minibatch_size, 1, -1)
             # Compute the score matrix of shape (num_tags, num_tags) where each entry at
             # row i and column j stores the score of transitioning from tag i to tag j
             # and emitting
             score = broadcast_score + self.transitions.data + broadcast_emission
             # Find the maximum score over all possible current tag
-            best_score, best_path = score.max(0)  # (num_tags,)
+            best_score, best_path = score.max(1)  # (minibatch_size,num_tags,)
             # Save the score and the path
-            viterbi_score = best_score
+            viterbi_score.append(best_score)
             viterbi_path.append(best_path)
 
-        # End transition
-        viterbi_score += self.end_transitions.data
+        # Now, compute the best path for each sample
+        for idx in range(minibatch_size):
+            # Find the tag which maximizes the score at the last timestep; this is our best tag
+            # for the last timestep
+            seq_end = sequence_lengths[idx]-1
+            _, best_last_tag = (viterbi_score[seq_end][idx] + self.end_transitions.data).max(0)
+            best_tags = [best_last_tag[0]]
 
-        # Find the tag which maximizes the score at the last timestep; this is our best tag
-        # for the last timestep
-        _, best_last_tag = viterbi_score.max(0)
-        best_tags = [best_last_tag[0]]
+            # We trace back where the best last tag comes from, append that to our best tag
+            # sequence, and trace it back again, and so on
+            for path in reversed(viterbi_path[:sequence_lengths[idx] - 1]):
+                best_last_tag = path[idx][best_tags[-1]]
+                best_tags.append(best_last_tag)
 
-        # We trace back where the best last tag comes from, append that to our best tag
-        # sequence, and trace it back again, and so on
-        for path in reversed(viterbi_path):
-            best_last_tag = path[best_tags[-1]]
-            best_tags.append(best_last_tag)
-
-        # Reverse the order because we start from the last timestep
-        best_tags.reverse()
-        return best_tags
+            # Reverse the order because we start from the last timestep
+            best_tags.reverse()
+            best_tags_list.append(best_tags)
+        return best_tags_list
 
     @staticmethod
     def _log_sum_exp(tensor: Variable, dim: int) -> Variable:
