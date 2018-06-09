@@ -263,7 +263,7 @@ class CRF(nn.Module):
             # Broadcast log_prob over all possible next tags
             broadcast_log_prob = log_prob[i-1].unsqueeze(2)  # (batch_size, num_tags, 1)
             # Broadcast transition score over all instances in the batch
-            broadcast_transitions = self.transitions.unsqueeze(0)  # (1, num_tags, num_tags)
+            broadcast_transitions = self.transitions.transpose(0,1).unsqueeze(0)  # (1, num_tags, num_tags)
             # Broadcast emission score over all possible current tags
             broadcast_emissions = emissions[seq_length-i-1].unsqueeze(1)  # (batch_size, 1, num_tags)
             # Sum current log probability, transition, and emission scores
@@ -288,8 +288,9 @@ class CRF(nn.Module):
         beta = self._compute_log_beta(emissions,mask)
         z = self._log_sum_exp(alpha[alpha.size(0)-1], 1)
 
-        prob = alpha + beta #- z.view(1,-1,1)
-        return prob
+        prob = alpha + beta - z.view(1,-1,1)
+        s = torch.nn.Softmax(dim=2)
+        return s(prob)
 
     def _viterbi_decode(self, emissions: torch.FloatTensor, mask: torch.ByteTensor) \
             -> List[List[int]]:
