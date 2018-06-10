@@ -332,3 +332,19 @@ class TestDecode(object):
         batched = crf.decode(emissions, mask=mask)
 
         assert non_batched == batched
+
+    def test_marginal_prob(self):
+        crf = make_crf()
+        seq_length, batch_size = 3, 2
+        emissions = make_emissions(seq_length, batch_size, crf.num_tags)
+        tags = make_tags(seq_length, batch_size, crf.num_tags)
+        # mask should be (seq_length, batch_size)
+        mask = torch.autograd.Variable(torch.ByteTensor([
+            [1, 1],
+            [1, 1],
+            [1, 0],
+        ]))
+
+        probs = crf.compute_log_marginal_probabilities(emissions, mask=mask)
+
+        assert probs.shape == emissions.shape

@@ -4,7 +4,6 @@ from torch.autograd import Variable
 import torch
 import torch.nn as nn
 
-
 class CRF(nn.Module):
     """Conditional random field.
 
@@ -196,9 +195,9 @@ class CRF(nn.Module):
 
         return llh
 
-    def _compute_log_partition_function(self,
-                                        emissions: Variable,
-                                        mask: Variable) -> Variable:
+    def _compute_log_alpha(self,
+                           emissions: Variable,
+                           mask: Variable) -> Variable:
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and mask.dim() == 2
@@ -210,13 +209,13 @@ class CRF(nn.Module):
         mask = mask.float()
 
         # Start transition score and first emission
-        log_prob = self.start_transitions.view(1, -1) + emissions[0]
+        log_prob = [self.start_transitions.view(1, -1) + emissions[0]]
         # Here, log_prob has size (batch_size, num_tags) where for each batch,
         # the j-th column stores the log probability that the current timestep has tag j
 
         for i in range(1, seq_length):
             # Broadcast log_prob over all possible next tags
-            broadcast_log_prob = log_prob.unsqueeze(2)  # (batch_size, num_tags, 1)
+            broadcast_log_prob = log_prob[i-1].unsqueeze(2)  # (batch_size, num_tags, 1)
             # Broadcast transition score over all instances in the batch
             broadcast_transitions = self.transitions.unsqueeze(0)  # (1, num_tags, num_tags)
             # Broadcast emission score over all possible current tags
@@ -229,12 +228,71 @@ class CRF(nn.Module):
             score = self._log_sum_exp(score, 1)  # (batch_size, num_tags)
             # Set log_prob to the score if this timestep is valid (mask == 1), otherwise
             # leave it alone
-            log_prob = score * mask[i].unsqueeze(1) + log_prob * (1.-mask[i]).unsqueeze(1)
+            log_prob.append(score * mask[i].unsqueeze(1) +
+                            log_prob[i-1] * (1.-mask[i]).unsqueeze(1))
 
         # End transition score
-        log_prob += self.end_transitions.view(1, -1)
-        # Sum (log-sum-exp) over all possible tags
-        return self._log_sum_exp(log_prob, 1)  # (batch_size,)
+        log_prob[len(log_prob)-1] += self.end_transitions.view(1, -1)
+        return torch.stack(log_prob)
+
+    def _compute_log_partition_function(self,
+                                        emissions: Variable,
+                                        mask: Variable) -> Variable:
+        alpha = self._compute_log_alpha(emissions, mask)
+        # Sum (log-sum-exp) over all possible tags at the last time stamp
+        return self._log_sum_exp(alpha[alpha.size(0)-1], 1)  # (batch_size,)
+
+    def _compute_log_beta(self,
+                          emissions: Variable,
+                          mask: Variable) -> Variable:
+        # emissions: (seq_length, batch_size, num_tags)
+        # mask: (seq_length, batch_size)
+        assert emissions.dim() == 3 and mask.dim() == 2
+        assert emissions.size()[:2] == mask.size()
+        assert emissions.size(2) == self.num_tags
+        assert all(mask[0].data)
+
+        seq_length = emissions.size(0)
+        mask = mask.float()
+
+        # End transition score and last emission
+        log_prob = [self.end_transitions.view(1, -1) + emissions[seq_length-1]]
+        # Here, log_prob has size (batch_size, num_tags) where for each batch,
+        # the j-th column stores the log probability that the current timestep has tag j
+
+        for i in range(1, seq_length):
+            # Broadcast log_prob over all possible next tags
+            broadcast_log_prob = log_prob[i-1].unsqueeze(2)  # (batch_size, num_tags, 1)
+            # Broadcast transition score over all instances in the batch
+            broadcast_transitions = self.transitions.\
+                transpose(0,1).unsqueeze(0)  # (1, num_tags, num_tags)
+            # Broadcast emission score over all possible current tags
+            broadcast_emissions = emissions[seq_length-i-1]\
+                .unsqueeze(1)  # (batch_size, 1, num_tags)
+            # Sum current log probability, transition, and emission scores
+            score = broadcast_log_prob + broadcast_transitions \
+                + broadcast_emissions  # (batch_size, num_tags, num_tags)
+            # Sum over all possible current tags, but we're in log prob space, so a sum
+            # becomes a log-sum-exp
+            score = self._log_sum_exp(score, 1)  # (batch_size, num_tags)
+            # Set log_prob to the score if this timestep is valid (mask == 1), otherwise
+            # leave it alone
+            log_prob.append(score * mask[seq_length-i-1].unsqueeze(1) +
+                            log_prob[i-1] * (1.-mask[seq_length-i-1]).unsqueeze(1))
+
+        # End transition score
+        log_prob[len(log_prob)-1] += self.start_transitions.view(1, -1)
+
+        log_prob.reverse()
+
+        return torch.stack(log_prob)
+
+    def compute_log_marginal_probabilities(self, emissions: Variable, mask: Variable) -> Variable:
+        alpha = self._compute_log_alpha(emissions,mask)
+        beta = self._compute_log_beta(emissions,mask)
+        z = self._log_sum_exp(alpha[alpha.size(0)-1], 1)
+        prob = alpha + beta - z.view(1,-1,1)
+        return prob
 
     def _viterbi_decode(self, emissions: torch.FloatTensor, mask: torch.ByteTensor) \
             -> List[List[int]]:
