@@ -197,20 +197,28 @@ class CRF(nn.Module):
         return llh
 
     def _compute_log_alpha(self,
-                           emissions: Variable,
-                           mask: Variable) -> Variable:
+                           emissions: Union[Variable, torch.FloatTensor],
+                           mask: Union[Variable, torch.ByteTensor]) -> Variable:
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and mask.dim() == 2
         assert emissions.size()[:2] == mask.size()
         assert emissions.size(2) == self.num_tags
-        assert all(mask[0].data)
+        if isinstance(emissions, Variable):
+            assert all(mask[0].data)
+            st = self.start_transitions
+            et = self.end_transitions
+            t = self.transitions
+        else:
+            st = self.start_transitions.data
+            et = self.end_transitions.data
+            t = self.transitions.data
 
         seq_length = emissions.size(0)
         mask = mask.float()
 
         # Start transition score and first emission
-        log_prob = [self.start_transitions.view(1, -1) + emissions[0]]
+        log_prob = [st.view(1, -1) + emissions[0]]
         # Here, log_prob has size (batch_size, num_tags) where for each batch,
         # the j-th column stores the log probability that the current timestep has tag j
 
@@ -218,7 +226,7 @@ class CRF(nn.Module):
             # Broadcast log_prob over all possible next tags
             broadcast_log_prob = log_prob[i-1].unsqueeze(2)  # (batch_size, num_tags, 1)
             # Broadcast transition score over all instances in the batch
-            broadcast_transitions = self.transitions.unsqueeze(0)  # (1, num_tags, num_tags)
+            broadcast_transitions = t.unsqueeze(0)  # (1, num_tags, num_tags)
             # Broadcast emission score over all possible current tags
             broadcast_emissions = emissions[i].unsqueeze(1)  # (batch_size, 1, num_tags)
             # Sum current log probability, transition, and emission scores
@@ -233,7 +241,7 @@ class CRF(nn.Module):
                             log_prob[i-1] * (1.-mask[i]).unsqueeze(1))
 
         # End transition score
-        log_prob[len(log_prob)-1] += self.end_transitions.view(1, -1)
+        log_prob[len(log_prob)-1] += et.view(1, -1)
         return torch.stack(log_prob)
 
     def _compute_log_partition_function(self,
@@ -244,20 +252,28 @@ class CRF(nn.Module):
         return self._log_sum_exp(alpha[alpha.size(0)-1], 1)  # (batch_size,)
 
     def _compute_log_beta(self,
-                          emissions: Variable,
-                          mask: Variable) -> Variable:
+                          emissions: Union[Variable, torch.FloatTensor],
+                          mask: Union[Variable, torch.ByteTensor]) -> Variable:
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and mask.dim() == 2
         assert emissions.size()[:2] == mask.size()
         assert emissions.size(2) == self.num_tags
-        assert all(mask[0].data)
+        if isinstance(emissions, Variable):
+            assert all(mask[0].data)
+            st = self.start_transitions
+            et = self.end_transitions
+            t = self.transitions
+        else:
+            st = self.start_transitions.data
+            et = self.end_transitions.data
+            t = self.transitions.data
 
         seq_length = emissions.size(0)
         mask = mask.float()
 
         # End transition score and last emission
-        log_prob = [self.end_transitions.view(1, -1) + emissions[seq_length-1]]
+        log_prob = [et.view(1, -1) + emissions[seq_length-1]]
         # Here, log_prob has size (batch_size, num_tags) where for each batch,
         # the j-th column stores the log probability that the current timestep has tag j
 
@@ -265,7 +281,7 @@ class CRF(nn.Module):
             # Broadcast log_prob over all possible next tags
             broadcast_log_prob = log_prob[i-1].unsqueeze(2)  # (batch_size, num_tags, 1)
             # Broadcast transition score over all instances in the batch
-            broadcast_transitions = self.transitions.\
+            broadcast_transitions = t.\
                 transpose(0, 1).unsqueeze(0)  # (1, num_tags, num_tags)
             # Broadcast emission score over all possible current tags
             broadcast_emissions = emissions[seq_length-i-1]\
@@ -282,7 +298,7 @@ class CRF(nn.Module):
                             log_prob[i-1] * (1.-mask[seq_length-i-1]).unsqueeze(1))
 
         # End transition score
-        log_prob[len(log_prob)-1] += self.start_transitions.view(1, -1)
+        log_prob[len(log_prob)-1] += st.view(1, -1)
 
         log_prob.reverse()
 
