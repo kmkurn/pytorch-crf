@@ -1,6 +1,5 @@
 from typing import List, Optional, Union
 
-from torch.autograd import Variable
 import torch
 import torch.nn as nn
 
@@ -55,19 +54,19 @@ class CRF(nn.Module):
         The parameters will be initialized randomly from a uniform distribution
         between -0.1 and 0.1.
         """
-        nn.init.uniform(self.start_transitions, -0.1, 0.1)
-        nn.init.uniform(self.end_transitions, -0.1, 0.1)
-        nn.init.uniform(self.transitions, -0.1, 0.1)
+        nn.init.uniform_(self.start_transitions, -0.1, 0.1)
+        nn.init.uniform_(self.end_transitions, -0.1, 0.1)
+        nn.init.uniform_(self.transitions, -0.1, 0.1)
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(num_tags={self.num_tags})'
 
     def forward(self,
-                emissions: Variable,
-                tags: Variable,
-                mask: Optional[Variable] = None,
+                emissions: torch.Tensor,
+                tags: torch.Tensor,
+                mask: Optional[torch.Tensor] = None,
                 reduce: bool = True,
-                ) -> Variable:
+                ) -> torch.Tensor:
         """Compute the log likelihood of the given sequence of tags and emission score.
 
         Arguments
@@ -111,7 +110,7 @@ class CRF(nn.Module):
                 raise ValueError('mask of the first timestep must all be on')
 
         if mask is None:
-            mask = Variable(self._new(tags.size()).fill_(1)).byte()
+            mask = torch.Tensor(self._new(tags.size()).fill_(1)).byte()
 
         numerator = self._compute_joint_llh(emissions, tags, mask)
         denominator = self._compute_log_partition_function(emissions, mask)
@@ -119,8 +118,8 @@ class CRF(nn.Module):
         return llh if not reduce else torch.sum(llh)
 
     def decode(self,
-               emissions: Union[Variable, torch.FloatTensor],
-               mask: Optional[Union[Variable, torch.ByteTensor]] = None) -> List[List[int]]:
+               emissions: Union[torch.Tensor, torch.FloatTensor],
+               mask: Optional[Union[torch.Tensor, torch.ByteTensor]] = None) -> List[List[int]]:
         """Find the most likely tag sequence using Viterbi algorithm.
 
         Arguments
@@ -148,19 +147,19 @@ class CRF(nn.Module):
                 f'got {tuple(emissions.size()[:2])} and {tuple(mask.size())}'
             )
 
-        if isinstance(emissions, Variable):
+        if isinstance(emissions, torch.Tensor):
             emissions = emissions.data
         if mask is None:
             mask = self._new(emissions.size()[:2]).fill_(1).byte()
-        elif isinstance(mask, Variable):
+        elif isinstance(mask, torch.Tensor):
             mask = mask.data
 
         return self._viterbi_decode(emissions, mask)
 
     def _compute_joint_llh(self,
-                           emissions: Variable,
-                           tags: Variable,
-                           mask: Variable) -> Variable:
+                           emissions: torch.Tensor,
+                           tags: torch.Tensor,
+                           mask: torch.Tensor) -> torch.Tensor:
         # emissions: (seq_length, batch_size, num_tags)
         # tags: (seq_length, batch_size)
         # mask: (seq_length, batch_size)
@@ -197,8 +196,8 @@ class CRF(nn.Module):
         return llh
 
     def _compute_log_partition_function(self,
-                                        emissions: Variable,
-                                        mask: Variable) -> Variable:
+                                        emissions: torch.Tensor,
+                                        mask: torch.Tensor) -> torch.Tensor:
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and mask.dim() == 2
@@ -223,7 +222,7 @@ class CRF(nn.Module):
             broadcast_emissions = emissions[i].unsqueeze(1)  # (batch_size, 1, num_tags)
             # Sum current log probability, transition, and emission scores
             score = broadcast_log_prob + broadcast_transitions \
-                + broadcast_emissions  # (batch_size, num_tags, num_tags)
+                    + broadcast_emissions  # (batch_size, num_tags, num_tags)
             # Sum over all possible current tags, but we're in log prob space, so a sum
             # becomes a log-sum-exp
             score = self._log_sum_exp(score, 1)  # (batch_size, num_tags)
@@ -282,7 +281,7 @@ class CRF(nn.Module):
             # for the last timestep
             seq_end = sequence_lengths[idx]-1
             _, best_last_tag = (viterbi_score[seq_end][idx] + self.end_transitions.data).max(0)
-            best_tags = [best_last_tag[0]]
+            best_tags = [best_last_tag.item()]
 
             # We trace back where the best last tag comes from, append that to our best tag
             # sequence, and trace it back again, and so on
@@ -296,7 +295,7 @@ class CRF(nn.Module):
         return best_tags_list
 
     @staticmethod
-    def _log_sum_exp(tensor: Variable, dim: int) -> Variable:
+    def _log_sum_exp(tensor: torch.Tensor, dim: int) -> torch.Tensor:
         # Find the max value along `dim`
         offset, _ = tensor.max(dim)
         # Make offset broadcastable
