@@ -298,7 +298,7 @@ class TestDecode(object):
         batch_size, seq_len, num_tags = 2, 3, 4
         crf = CRF(num_tags)
         emissions = torch.randn(seq_len, batch_size, num_tags)
-        mask = torch.ByteTensor([[1, 1, 1], [1, 1, 0]]).transpose(0, 1)
+        mask = torch.tensor([[1, 1, 1], [1, 1, 0]], dtype=torch.uint8).transpose(0, 1)
 
         # non-batched
         non_batched = []

@@ -43,9 +43,9 @@ class CRF(nn.Module):
             raise ValueError(f'invalid number of tags: {num_tags}')
         super().__init__()
         self.num_tags = num_tags
-        self.start_transitions = nn.Parameter(torch.Tensor(num_tags))
-        self.end_transitions = nn.Parameter(torch.Tensor(num_tags))
-        self.transitions = nn.Parameter(torch.Tensor(num_tags, num_tags))
+        self.start_transitions = nn.Parameter(torch.empty(num_tags))
+        self.end_transitions = nn.Parameter(torch.empty(num_tags))
+        self.transitions = nn.Parameter(torch.empty(num_tags, num_tags))
 
         self.reset_parameters()
 
