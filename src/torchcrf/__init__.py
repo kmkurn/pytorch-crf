@@ -55,9 +55,9 @@ class CRF(nn.Module):
         The parameters will be initialized randomly from a uniform distribution
         between -0.1 and 0.1.
         """
-        nn.init.uniform(self.start_transitions, -0.1, 0.1)
-        nn.init.uniform(self.end_transitions, -0.1, 0.1)
-        nn.init.uniform(self.transitions, -0.1, 0.1)
+        nn.init.uniform_(self.start_transitions, -0.1, 0.1)
+        nn.init.uniform_(self.end_transitions, -0.1, 0.1)
+        nn.init.uniform_(self.transitions, -0.1, 0.1)
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(num_tags={self.num_tags})'
@@ -278,7 +278,7 @@ class CRF(nn.Module):
             # for the last timestep
             seq_end = sequence_lengths[idx]-1
             _, best_last_tag = (viterbi_score[seq_end][idx] + self.end_transitions).max(0)
-            best_tags = [best_last_tag[0]]
+            best_tags = [best_last_tag.item()]
 
             # We trace back where the best last tag comes from, append that to our best tag
             # sequence, and trace it back again, and so on
