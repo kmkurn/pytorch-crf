@@ -111,7 +111,7 @@ class CRF(nn.Module):
                 raise ValueError('mask of the first timestep must all be on')
 
         if mask is None:
-            mask = Variable(self._new(tags.size()).fill_(1)).byte()
+            mask = torch.ones_like(tags, dtype=torch.uint8)
 
         numerator = self._compute_joint_llh(emissions, tags, mask)
         denominator = self._compute_log_partition_function(emissions, mask)
@@ -149,7 +149,7 @@ class CRF(nn.Module):
             )
 
         if mask is None:
-            mask = self._new(emissions.size()[:2]).fill_(1).byte()
+            mask = emissions.new_ones(emissions.shape[:2], dtype=torch.uint8)
 
         return self._viterbi_decode(emissions, mask)
 
@@ -301,7 +301,3 @@ class CRF(nn.Module):
         safe_log_sum_exp = torch.log(torch.sum(torch.exp(tensor - broadcast_offset), dim))
         # Add offset back
         return offset + safe_log_sum_exp
-
-    def _new(self, *args, **kwargs) -> Union[torch.FloatTensor, torch.cuda.FloatTensor]:
-        param = next(self.parameters())
-        return param.new(*args, **kwargs)
