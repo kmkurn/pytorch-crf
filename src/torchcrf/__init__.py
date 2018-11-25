@@ -107,7 +107,7 @@ class CRF(nn.Module):
                     f'size of tags and mask must match, got {tuple(tags.size())} '
                     f'and {tuple(mask.size())}'
                 )
-            if not all(mask[0].data):
+            if not all(mask[0]):
                 raise ValueError('mask of the first timestep must all be on')
 
         if mask is None:
@@ -148,12 +148,8 @@ class CRF(nn.Module):
                 f'got {tuple(emissions.size()[:2])} and {tuple(mask.size())}'
             )
 
-        if isinstance(emissions, Variable):
-            emissions = emissions.data
         if mask is None:
             mask = self._new(emissions.size()[:2]).fill_(1).byte()
-        elif isinstance(mask, Variable):
-            mask = mask.data
 
         return self._viterbi_decode(emissions, mask)
 
@@ -168,7 +164,7 @@ class CRF(nn.Module):
         assert emissions.size()[:2] == tags.size()
         assert emissions.size(2) == self.num_tags
         assert mask.size() == tags.size()
-        assert all(mask[0].data)
+        assert all(mask[0])
 
         seq_length = emissions.size(0)
         mask = mask.float()
@@ -204,7 +200,7 @@ class CRF(nn.Module):
         assert emissions.dim() == 3 and mask.dim() == 2
         assert emissions.size()[:2] == mask.size()
         assert emissions.size(2) == self.num_tags
-        assert all(mask[0].data)
+        assert all(mask[0])
 
         seq_length = emissions.size(0)
         mask = mask.float()
@@ -251,7 +247,7 @@ class CRF(nn.Module):
 
         # Start transition
         viterbi_score = []
-        viterbi_score.append(self.start_transitions.data + emissions[0])
+        viterbi_score.append(self.start_transitions + emissions[0])
         viterbi_path = []
 
         # Here, viterbi_score is a list of tensors of shapes of (num_tags,) where value at
@@ -269,7 +265,7 @@ class CRF(nn.Module):
             # Compute the score matrix of shape (batch_size, num_tags, num_tags) where
             # for each sample, each entry at row i and column j stores the score of
             # transitioning from tag i to tag j and emitting
-            score = broadcast_score + self.transitions.data + broadcast_emission
+            score = broadcast_score + self.transitions + broadcast_emission
             # Find the maximum score over all possible current tag
             best_score, best_path = score.max(1)  # (batch_size,num_tags,)
             # Save the score and the path
@@ -281,7 +277,7 @@ class CRF(nn.Module):
             # Find the tag which maximizes the score at the last timestep; this is our best tag
             # for the last timestep
             seq_end = sequence_lengths[idx]-1
-            _, best_last_tag = (viterbi_score[seq_end][idx] + self.end_transitions.data).max(0)
+            _, best_last_tag = (viterbi_score[seq_end][idx] + self.end_transitions).max(0)
             best_tags = [best_last_tag[0]]
 
             # We trace back where the best last tag comes from, append that to our best tag
@@ -308,4 +304,4 @@ class CRF(nn.Module):
 
     def _new(self, *args, **kwargs) -> Union[torch.FloatTensor, torch.cuda.FloatTensor]:
         param = next(self.parameters())
-        return param.data.new(*args, **kwargs)
+        return param.new(*args, **kwargs)
