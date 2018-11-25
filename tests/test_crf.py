@@ -21,9 +21,9 @@ def compute_score(crf, emission, tag):
     assert len(emission) == len(tag)
 
     # Add transitions score
-    score = crf.start_transitions.data[tag[0]] + crf.end_transitions.data[tag[-1]]
+    score = crf.start_transitions[tag[0]] + crf.end_transitions[tag[-1]]
     for cur_tag, next_tag in zip(tag, tag[1:]):
-        score += crf.transitions.data[cur_tag, next_tag]
+        score += crf.transitions[cur_tag, next_tag]
     # Add emission score
     for emit, t in zip(emission, tag):
         score += emit[t]
@@ -105,7 +105,7 @@ class TestForward(object):
         mask = mask.transpose(0, 1)
         # Compute manual log likelihood
         manual_llh = 0.
-        for emission, tag, mask_ in zip(emissions.data, tags.data, mask.data):
+        for emission, tag, mask_ in zip(emissions, tags, mask):
             seq_len = mask_.sum()
             emission, tag = emission[:seq_len], tag[:seq_len]
             numerator = compute_score(crf, emission, tag)
@@ -146,14 +146,14 @@ class TestForward(object):
         tags = tags.transpose(0, 1)
         # Compute manual log likelihood
         manual_llh = []
-        for emission, tag in zip(emissions.data, tags.data):
+        for emission, tag in zip(emissions, tags):
             numerator = compute_score(crf, emission, tag)
             all_scores = [compute_score(crf, emission, t)
                           for t in itertools.product(range(crf.num_tags), repeat=seq_length)]
             denominator = math.log(sum(math.exp(s) for s in all_scores))
             manual_llh.append(numerator - denominator)
 
-        for llh_, manual_llh_ in zip(llh.data, manual_llh):
+        for llh_, manual_llh_ in zip(llh, manual_llh):
             assert llh_.item() == approx(manual_llh_)
 
     def test_emissions_has_bad_number_of_dimension(self):
@@ -239,7 +239,7 @@ class TestDecode(object):
         # Swap seq_length and batch_size
         emissions = emissions.transpose(0, 1)
         # Compute best tag manually
-        for emission, best_tag in zip(emissions.data, best_tags):
+        for emission, best_tag in zip(emissions, best_tags):
             manual_best_tag = max(itertools.product(range(crf.num_tags), repeat=seq_length),
                                   key=lambda t: compute_score(crf, emission, t))
             assert tuple(best_tag) == manual_best_tag
@@ -261,31 +261,13 @@ class TestDecode(object):
         emissions = emissions.transpose(0, 1)
         mask = mask.transpose(0, 1)
         # Compute best tag manually
-        for emission, best_tag, mask_ in zip(emissions.data, best_tags, mask.data):
+        for emission, best_tag, mask_ in zip(emissions, best_tags, mask):
             seq_len = mask_.sum()
             assert len(best_tag) == seq_len
             emission = emission[:seq_len]
             manual_best_tag = max(itertools.product(range(crf.num_tags), repeat=seq_len),
                                   key=lambda t: compute_score(crf, emission, t))
             assert tuple(best_tag) == manual_best_tag
-
-    def test_works_with_tensor(self):
-        crf = make_crf()
-        seq_length, batch_size = 3, 2
-        emissions_var = make_emissions(seq_length, batch_size, crf.num_tags)
-        emissions = emissions_var.data
-        # mask should be (seq_length, batch_size)
-        mask = torch.ByteTensor([
-            [1, 1],
-            [1, 1],
-            [1, 0],
-        ])
-        mask_var = torch.autograd.Variable(mask)
-
-        best_tags = crf.decode(emissions, mask=mask)
-        best_tags_var = crf.decode(emissions_var, mask=mask_var)
-
-        assert best_tags == best_tags_var
 
     def test_emissions_has_bad_number_of_dimension(self):
         emissions = torch.autograd.Variable(torch.randn(1, 2))
