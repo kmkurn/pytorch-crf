@@ -1,7 +1,4 @@
 language: python
-env:
-  - PYTORCH_VERSION=0.3.0
-  - PYTORCH_VERSION=0.3.1
 before_install:
   - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh
   - bash ~/miniconda.sh -b -p $HOME/miniconda
@@ -9,9 +6,7 @@ before_install:
   - conda update -y conda
   - conda create -y -n pytorch-crf python=3.6
   - source activate pytorch-crf
-  - conda install -y -c pytorch pytorch=$PYTORCH_VERSION
-  # explicitly specify cudatoolkit version (see https://discuss.pytorch.org/t/libcudart-so-8-0-not-found-in-travis-ci/16071/3)
-  - if [[ $PYTORCH_VERSION == "0.3.0" ]]; then conda install -y -c pytorch cudatoolkit=8.0; fi
+  - conda install -y -c pytorch pytorch=0.4.1
   - export LD_LIBRARY_PATH="$HOME/miniconda/envs/pytorch-crf/lib:$LD_LIBRARY_PATH"
 install:
   - pip install --ignore-installed -r requirements.txt
