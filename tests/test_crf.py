@@ -35,15 +35,14 @@ def make_crf(num_tags=5):
 
 
 def make_emissions(seq_length=3, batch_size=2, num_tags=5):
-    return torch.autograd.Variable(torch.randn(seq_length, batch_size, num_tags),
-                                   requires_grad=True)
+    return torch.randn(seq_length, batch_size, num_tags, requires_grad=True)
 
 
 def make_tags(seq_length=3, batch_size=2, num_tags=5):
-    return torch.autograd.Variable(torch.LongTensor([
+    return torch.tensor([
         [random.randrange(num_tags) for b in range(batch_size)]
         for _ in range(seq_length)
-    ]))
+    ], dtype=torch.long)
 
 
 class TestInit(object):
@@ -75,7 +74,7 @@ class TestForward(object):
 
         llh = crf(emissions, tags)
 
-        assert isinstance(llh, torch.autograd.Variable)
+        assert torch.is_tensor(llh)
         assert llh.size() == ()
         total_llh = 0.
         for i in range(batch_size):
@@ -91,11 +90,11 @@ class TestForward(object):
         emissions = make_emissions(seq_length, batch_size, crf.num_tags)
         tags = make_tags(seq_length, batch_size, crf.num_tags)
         # mask should be (seq_length, batch_size)
-        mask = torch.autograd.Variable(torch.ByteTensor([
+        mask = torch.tensor([
             [1, 1],
             [1, 1],
             [1, 0],
-        ]))
+        ], dtype=torch.uint8)
 
         llh = crf(emissions, tags, mask=mask)
 
@@ -126,7 +125,7 @@ class TestForward(object):
 
         llh_no_mask = crf(emissions, tags)
         # No mask means the mask is all ones
-        mask = torch.autograd.Variable(torch.ones(seq_length, batch_size)).byte()
+        mask = torch.ones(seq_length, batch_size).byte()
         llh_mask = crf(emissions, tags, mask=mask)
 
         assert llh_no_mask.item() == approx(llh_mask.item())
@@ -139,7 +138,7 @@ class TestForward(object):
 
         llh = crf(emissions, tags, reduce=False)
 
-        assert isinstance(llh, torch.autograd.Variable)
+        assert torch.is_tensor(llh)
         assert llh.size() == (batch_size,)
         # Swap seq_length and batch_size, now they're both (batch_size, seq_length, *)
         emissions = emissions.transpose(0, 1)
@@ -157,8 +156,8 @@ class TestForward(object):
             assert llh_.item() == approx(manual_llh_)
 
     def test_emissions_has_bad_number_of_dimension(self):
-        emissions = torch.autograd.Variable(torch.randn(1, 2), requires_grad=True)
-        tags = torch.autograd.Variable(torch.LongTensor(2, 2))
+        emissions = torch.randn(1, 2, requires_grad=True)
+        tags = torch.empty(2, 2, dtype=torch.long)
         crf = make_crf()
 
         with pytest.raises(ValueError) as excinfo:
@@ -166,8 +165,8 @@ class TestForward(object):
         assert 'emissions must have dimension of 3, got 2' in str(excinfo.value)
 
     def test_tags_has_bad_number_of_dimension(self):
-        emissions = torch.autograd.Variable(torch.randn(1, 2, 3), requires_grad=True)
-        tags = torch.autograd.Variable(torch.LongTensor(2, 2, 2))
+        emissions = torch.randn(1, 2, 3, requires_grad=True)
+        tags = torch.empty(2, 2, 2, dtype=torch.long)
         crf = make_crf(3)
 
         with pytest.raises(ValueError) as excinfo:
@@ -175,8 +174,8 @@ class TestForward(object):
         assert 'tags must have dimension of 2, got 3' in str(excinfo.value)
 
     def test_emissions_and_tags_size_mismatch(self):
-        emissions = torch.autograd.Variable(torch.randn(1, 2, 3), requires_grad=True)
-        tags = torch.autograd.Variable(torch.LongTensor(2, 2))
+        emissions = torch.randn(1, 2, 3, requires_grad=True)
+        tags = torch.empty(2, 2, dtype=torch.long)
         crf = make_crf(3)
 
         with pytest.raises(ValueError) as excinfo:
@@ -185,8 +184,8 @@ class TestForward(object):
                 'got (1, 2) and (2, 2)') in str(excinfo.value)
 
     def test_emissions_last_dimension_not_equal_to_number_of_tags(self):
-        emissions = torch.autograd.Variable(torch.randn(1, 2, 3), requires_grad=True)
-        tags = torch.autograd.Variable(torch.LongTensor(1, 2))
+        emissions = torch.randn(1, 2, 3, requires_grad=True)
+        tags = torch.empty(1, 2, dtype=torch.long)
         crf = make_crf(10)
 
         with pytest.raises(ValueError) as excinfo:
@@ -194,9 +193,9 @@ class TestForward(object):
         assert 'expected last dimension of emissions is 10, got 3' in str(excinfo.value)
 
     def test_mask_and_tags_size_mismatch(self):
-        emissions = torch.autograd.Variable(torch.randn(1, 2, 3), requires_grad=True)
-        tags = torch.autograd.Variable(torch.LongTensor(1, 2))
-        mask = torch.autograd.Variable(torch.ByteTensor([[1], [1]]))
+        emissions = torch.randn(1, 2, 3, requires_grad=True)
+        tags = torch.empty(1, 2, dtype=torch.long)
+        mask = torch.tensor([[1], [1]], dtype=torch.uint8)
         crf = make_crf(3)
 
         with pytest.raises(ValueError) as excinfo:
@@ -206,9 +205,9 @@ class TestForward(object):
         )
 
     def test_first_timestep_mask_is_not_all_on(self):
-        emissions = torch.autograd.Variable(torch.randn(1, 2, 3), requires_grad=True)
-        tags = torch.autograd.Variable(torch.LongTensor(1, 2))
-        mask = torch.autograd.Variable(torch.ByteTensor([[0, 1]]))
+        emissions = torch.randn(1, 2, 3, requires_grad=True)
+        tags = torch.empty(1, 2, dtype=torch.long)
+        mask = torch.tensor([[0, 1]], dtype=torch.uint8)
         crf = make_crf(3)
 
         with pytest.raises(ValueError) as excinfo:
@@ -249,11 +248,11 @@ class TestDecode(object):
         seq_length, batch_size = 3, 2
         emissions = make_emissions(seq_length, batch_size, crf.num_tags)
         # mask should be (seq_length, batch_size)
-        mask = torch.autograd.Variable(torch.ByteTensor([
+        mask = torch.tensor([
             [1, 1],
             [1, 1],
             [1, 0],
-        ]))
+        ], dtype=torch.uint8)
 
         best_tags = crf.decode(emissions, mask=mask)
 
@@ -270,7 +269,7 @@ class TestDecode(object):
             assert tuple(best_tag) == manual_best_tag
 
     def test_emissions_has_bad_number_of_dimension(self):
-        emissions = torch.autograd.Variable(torch.randn(1, 2))
+        emissions = torch.randn(1, 2)
         crf = make_crf()
 
         with pytest.raises(ValueError) as excinfo:
@@ -278,7 +277,7 @@ class TestDecode(object):
         assert 'emissions must have dimension of 3, got 2' in str(excinfo.value)
 
     def test_emissions_last_dimension_not_equal_to_number_of_tags(self):
-        emissions = torch.autograd.Variable(torch.randn(1, 2, 3))
+        emissions = torch.randn(1, 2, 3)
         crf = make_crf(10)
 
         with pytest.raises(ValueError) as excinfo:
@@ -286,8 +285,8 @@ class TestDecode(object):
         assert 'expected last dimension of emissions is 10, got 3' in str(excinfo.value)
 
     def test_emissions_and_mask_size_mismatch(self):
-        emissions = torch.autograd.Variable(torch.randn(1, 2, 3))
-        mask = torch.autograd.Variable(torch.ByteTensor([[1, 1], [1, 0]]))
+        emissions = torch.randn(1, 2, 3)
+        mask = torch.tensor([[1, 1], [1, 0]], dtype=torch.uint8)
         crf = make_crf(3)
 
         with pytest.raises(ValueError) as excinfo:
