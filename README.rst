@@ -24,7 +24,7 @@ Requirements
 ============
 
 - Python 3.6
-- PyTorch 0.3.0
+- PyTorch 0.4.1
 
 Installation
 ============
@@ -47,8 +47,8 @@ In the examples below, we will assume that these lines have been executed
     >>> import torch
     >>> from torchcrf import CRF
     >>> seq_length, batch_size, num_tags = 3, 2, 5
-    >>> emissions = torch.autograd.Variable(torch.randn(seq_length, batch_size, num_tags), requires_grad=True)
-    >>> tags = torch.autograd.Variable(torch.LongTensor([[0, 1], [2, 4], [3, 1]]))  # (seq_length, batch_size)
+    >>> emissions = torch.randn(seq_length, batch_size, num_tags, requires_grad=True)
+    >>> tags = torch.tensor([[0, 1], [2, 4], [3, 1]], dtype=torch.long)  # (seq_length, batch_size)
     >>> model = CRF(num_tags)
 
 Computing log likelihood
@@ -57,20 +57,16 @@ Computing log likelihood
 .. code-block:: python
 
     >>> model(emissions, tags)
-    Variable containing:
-    -10.0635
-    [torch.FloatTensor of size 1]
+    tensor(-12.7431, grad_fn=<SumBackward0>)
 
 Computing log likelihood with mask
 ----------------------------------
 
 .. code-block:: python
 
-    >>> mask = torch.autograd.Variable(torch.ByteTensor([[1, 1], [1, 1], [1, 0]]))  # (seq_length, batch_size)
+    >>> mask = torch.tensor([[1, 1], [1, 1], [1, 0]], dtype=torch.uint8)  # (seq_length, batch_size)
     >>> model(emissions, tags, mask=mask)
-    Variable containing:
-    -8.4981
-    [torch.FloatTensor of size 1]
+    tensor(-10.8390, grad_fn=<SumBackward0>)
 
 Decoding
 --------
