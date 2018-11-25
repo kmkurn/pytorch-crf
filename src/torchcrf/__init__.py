@@ -222,7 +222,7 @@ class CRF(nn.Module):
                 + broadcast_emissions  # (batch_size, num_tags, num_tags)
             # Sum over all possible current tags, but we're in log prob space, so a sum
             # becomes a log-sum-exp
-            score = self._log_sum_exp(score, 1)  # (batch_size, num_tags)
+            score = torch.logsumexp(score, 1)  # (batch_size, num_tags)
             # Set log_prob to the score if this timestep is valid (mask == 1), otherwise
             # leave it alone
             log_prob = score * mask[i].unsqueeze(1) + log_prob * (1.-mask[i]).unsqueeze(1)
@@ -230,7 +230,7 @@ class CRF(nn.Module):
         # End transition score
         log_prob += self.end_transitions.view(1, -1)
         # Sum (log-sum-exp) over all possible tags
-        return self._log_sum_exp(log_prob, 1)  # (batch_size,)
+        return torch.logsumexp(log_prob, 1)  # (batch_size,)
 
     def _viterbi_decode(self, emissions: torch.FloatTensor, mask: torch.ByteTensor) \
             -> List[List[int]]:
@@ -290,14 +290,3 @@ class CRF(nn.Module):
             best_tags.reverse()
             best_tags_list.append(best_tags)
         return best_tags_list
-
-    @staticmethod
-    def _log_sum_exp(tensor: Variable, dim: int) -> Variable:
-        # Find the max value along `dim`
-        offset, _ = tensor.max(dim)
-        # Make offset broadcastable
-        broadcast_offset = offset.unsqueeze(dim)
-        # Perform log-sum-exp safely
-        safe_log_sum_exp = torch.log(torch.sum(torch.exp(tensor - broadcast_offset), dim))
-        # Add offset back
-        return offset + safe_log_sum_exp
