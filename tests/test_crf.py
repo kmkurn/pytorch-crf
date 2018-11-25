@@ -76,14 +76,14 @@ class TestForward(object):
         llh = crf(emissions, tags)
 
         assert isinstance(llh, torch.autograd.Variable)
-        assert llh.size() == (1,)
+        assert llh.size() == ()
         total_llh = 0.
         for i in range(batch_size):
             emissions_ = emissions[:, i, :].unsqueeze(1)
             tags_ = tags[:, i].unsqueeze(1)
             total_llh += crf(emissions_, tags_)
 
-        assert llh.data[0] == approx(total_llh.data[0])
+        assert llh.item() == approx(total_llh.item())
 
     def test_works_with_mask(self):
         crf = make_crf()
@@ -114,7 +114,7 @@ class TestForward(object):
             denominator = math.log(sum(math.exp(s) for s in all_scores))
             manual_llh += numerator - denominator
         # Assert equal to manual log likelihood
-        assert llh.data[0] == approx(manual_llh)
+        assert llh.item() == approx(manual_llh)
         # Make sure gradients can be computed
         llh.backward()
 
@@ -129,7 +129,7 @@ class TestForward(object):
         mask = torch.autograd.Variable(torch.ones(seq_length, batch_size)).byte()
         llh_mask = crf(emissions, tags, mask=mask)
 
-        assert llh_no_mask.data[0] == approx(llh_mask.data[0])
+        assert llh_no_mask.item() == approx(llh_mask.item())
 
     def test_not_summed_over_batch(self):
         crf = make_crf()
@@ -154,7 +154,7 @@ class TestForward(object):
             manual_llh.append(numerator - denominator)
 
         for llh_, manual_llh_ in zip(llh.data, manual_llh):
-            assert llh_ == approx(manual_llh_)
+            assert llh_.item() == approx(manual_llh_)
 
     def test_emissions_has_bad_number_of_dimension(self):
         emissions = torch.autograd.Variable(torch.randn(1, 2), requires_grad=True)
