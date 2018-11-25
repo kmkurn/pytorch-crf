@@ -1,6 +1,5 @@
-from typing import List, Optional, Union
+from typing import List, Optional
 
-from torch.autograd import Variable
 import torch
 import torch.nn as nn
 
@@ -20,8 +19,6 @@ class CRF(nn.Module):
 
     Attributes
     ----------
-    num_tags : int
-        Number of tags passed to ``__init__``.
     start_transitions : :class:`~torch.nn.Parameter`
         Start transition score tensor of size ``(num_tags,)``.
     end_transitions : :class:`~torch.nn.Parameter`
@@ -63,27 +60,27 @@ class CRF(nn.Module):
         return f'{self.__class__.__name__}(num_tags={self.num_tags})'
 
     def forward(self,
-                emissions: Variable,
-                tags: Variable,
-                mask: Optional[Variable] = None,
+                emissions: torch.Tensor,
+                tags: torch.LongTensor,
+                mask: Optional[torch.ByteTensor] = None,
                 reduce: bool = True,
-                ) -> Variable:
+                ) -> torch.Tensor:
         """Compute the log likelihood of the given sequence of tags and emission score.
 
         Arguments
         ---------
-        emissions : :class:`~torch.autograd.Variable`
+        emissions : :class:`~torch.Tensor`
             Emission score tensor of size ``(seq_length, batch_size, num_tags)``.
-        tags : :class:`~torch.autograd.Variable`
-            Sequence of tags as ``LongTensor`` of size ``(seq_length, batch_size)``.
-        mask : :class:`~torch.autograd.Variable`, optional
-            Mask tensor as ``ByteTensor`` of size ``(seq_length, batch_size)``.
+        tags : :class:`~torch.LongTensor`
+            Sequence of tags of size ``(seq_length, batch_size)``.
+        mask : :class:`~torch.ByteTensor`, optional
+            Mask tensor of size ``(seq_length, batch_size)``.
         reduce : bool
             Whether to sum the log likelihood over the batch.
 
         Returns
         -------
-        :class:`~torch.autograd.Variable`
+        :class:`~torch.Tensor`
             The log likelihood. This will have size (1,) if ``reduce=True``, ``(batch_size,)``
             otherwise.
         """
@@ -119,20 +116,20 @@ class CRF(nn.Module):
         return llh if not reduce else torch.sum(llh)
 
     def decode(self,
-               emissions: Union[Variable, torch.FloatTensor],
-               mask: Optional[Union[Variable, torch.ByteTensor]] = None) -> List[List[int]]:
+               emissions: torch.Tensor,
+               mask: Optional[torch.ByteTensor] = None) -> List[List[int]]:
         """Find the most likely tag sequence using Viterbi algorithm.
 
         Arguments
         ---------
-        emissions : :class:`~torch.autograd.Variable` or :class:`~torch.FloatTensor`
+        emissions : :class:`~torch.Tensor`
             Emission score tensor of size ``(seq_length, batch_size, num_tags)``.
-        mask : :class:`~torch.autograd.Variable` or :class:`torch.ByteTensor`
+        mask : :class:`~torch.ByteTensor`
             Mask tensor of size ``(seq_length, batch_size)``.
 
         Returns
         -------
-        list
+        List[List[int]]
             List of list containing the best tag sequence for each batch.
         """
         if emissions.dim() != 3:
@@ -154,9 +151,9 @@ class CRF(nn.Module):
         return self._viterbi_decode(emissions, mask)
 
     def _compute_joint_llh(self,
-                           emissions: Variable,
-                           tags: Variable,
-                           mask: Variable) -> Variable:
+                           emissions: torch.Tensor,
+                           tags: torch.LongTensor,
+                           mask: torch.ByteTensor) -> torch.Tensor:
         # emissions: (seq_length, batch_size, num_tags)
         # tags: (seq_length, batch_size)
         # mask: (seq_length, batch_size)
@@ -193,8 +190,8 @@ class CRF(nn.Module):
         return llh
 
     def _compute_log_partition_function(self,
-                                        emissions: Variable,
-                                        mask: Variable) -> Variable:
+                                        emissions: torch.Tensor,
+                                        mask: torch.ByteTensor) -> torch.Tensor:
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and mask.dim() == 2
