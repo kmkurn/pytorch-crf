@@ -239,6 +239,7 @@ class TestDecode(object):
         emissions = emissions.transpose(0, 1)
         # Compute best tag manually
         for emission, best_tag in zip(emissions, best_tags):
+            assert all(isinstance(t, int) for t in best_tag)
             manual_best_tag = max(itertools.product(range(crf.num_tags), repeat=seq_length),
                                   key=lambda t: compute_score(crf, emission, t))
             assert tuple(best_tag) == manual_best_tag
@@ -263,6 +264,7 @@ class TestDecode(object):
         for emission, best_tag, mask_ in zip(emissions, best_tags, mask):
             seq_len = mask_.sum()
             assert len(best_tag) == seq_len
+            assert all(isinstance(t, int) for t in best_tag)
             emission = emission[:seq_len]
             manual_best_tag = max(itertools.product(range(crf.num_tags), repeat=seq_len),
                                   key=lambda t: compute_score(crf, emission, t))

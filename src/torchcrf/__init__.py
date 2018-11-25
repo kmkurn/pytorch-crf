@@ -273,7 +273,7 @@ class CRF(nn.Module):
         for idx in range(batch_size):
             # Find the tag which maximizes the score at the last timestep; this is our best tag
             # for the last timestep
-            seq_end = sequence_lengths[idx]-1
+            seq_end = sequence_lengths[idx] - 1
             _, best_last_tag = (viterbi_score[seq_end][idx] + self.end_transitions).max(0)
             best_tags = [best_last_tag.item()]
 
@@ -281,7 +281,7 @@ class CRF(nn.Module):
             # sequence, and trace it back again, and so on
             for path in reversed(viterbi_path[:sequence_lengths[idx] - 1]):
                 best_last_tag = path[idx][best_tags[-1]]
-                best_tags.append(best_last_tag)
+                best_tags.append(best_last_tag.item())
 
             # Reverse the order because we start from the last timestep
             best_tags.reverse()
