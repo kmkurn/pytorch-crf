@@ -306,6 +306,6 @@ class CRF(nn.Module):
         # Add offset back
         return offset + safe_log_sum_exp
 
-    def _new(self, *args, **kwargs) -> torch.FloatTensor:
+    def _new(self, *args, **kwargs) -> Union[torch.FloatTensor, torch.cuda.FloatTensor]:
         param = next(self.parameters())
         return param.data.new(*args, **kwargs)
