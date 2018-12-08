@@ -116,6 +116,13 @@ install this package in development mode. ::
     pip install -r requirements.txt
     pip install -e .
 
+Setup pre-commit hook
+---------------------
+
+Simply run ::
+
+    ln -s ../../pre-commit.sh .git/hooks/pre-commit
+
 Running tests
 -------------
 
