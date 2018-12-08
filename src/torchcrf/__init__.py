@@ -35,6 +35,7 @@ class CRF(nn.Module):
 
     .. _Viterbi algorithm: https://en.wikipedia.org/wiki/Viterbi_algorithm
     """
+
     def __init__(self, num_tags: int) -> None:
         if num_tags <= 0:
             raise ValueError(f'invalid number of tags: {num_tags}')
@@ -59,12 +60,13 @@ class CRF(nn.Module):
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(num_tags={self.num_tags})'
 
-    def forward(self,
-                emissions: torch.Tensor,
-                tags: torch.LongTensor,
-                mask: Optional[torch.ByteTensor] = None,
-                reduce: bool = True,
-                ) -> torch.Tensor:
+    def forward(
+            self,
+            emissions: torch.Tensor,
+            tags: torch.LongTensor,
+            mask: Optional[torch.ByteTensor] = None,
+            reduce: bool = True,
+    ) -> torch.Tensor:
         """Compute the log likelihood of the given sequence of tags and emission score.
 
         Arguments
@@ -91,19 +93,16 @@ class CRF(nn.Module):
         if emissions.size()[:2] != tags.size():
             raise ValueError(
                 'the first two dimensions of emissions and tags must match, '
-                f'got {tuple(emissions.size()[:2])} and {tuple(tags.size())}'
-            )
+                f'got {tuple(emissions.size()[:2])} and {tuple(tags.size())}')
         if emissions.size(2) != self.num_tags:
             raise ValueError(
                 f'expected last dimension of emissions is {self.num_tags}, '
-                f'got {emissions.size(2)}'
-            )
+                f'got {emissions.size(2)}')
         if mask is not None:
             if tags.size() != mask.size():
                 raise ValueError(
                     f'size of tags and mask must match, got {tuple(tags.size())} '
-                    f'and {tuple(mask.size())}'
-                )
+                    f'and {tuple(mask.size())}')
             if not all(mask[0]):
                 raise ValueError('mask of the first timestep must all be on')
 
@@ -115,8 +114,7 @@ class CRF(nn.Module):
         llh = numerator - denominator
         return llh if not reduce else torch.sum(llh)
 
-    def decode(self,
-               emissions: torch.Tensor,
+    def decode(self, emissions: torch.Tensor,
                mask: Optional[torch.ByteTensor] = None) -> List[List[int]]:
         """Find the most likely tag sequence using Viterbi algorithm.
 
@@ -137,23 +135,20 @@ class CRF(nn.Module):
         if emissions.size(2) != self.num_tags:
             raise ValueError(
                 f'expected last dimension of emissions is {self.num_tags}, '
-                f'got {emissions.size(2)}'
-            )
+                f'got {emissions.size(2)}')
         if mask is not None and emissions.size()[:2] != mask.size():
             raise ValueError(
                 'the first two dimensions of emissions and mask must match, '
-                f'got {tuple(emissions.size()[:2])} and {tuple(mask.size())}'
-            )
+                f'got {tuple(emissions.size()[:2])} and {tuple(mask.size())}')
 
         if mask is None:
             mask = emissions.new_ones(emissions.shape[:2], dtype=torch.uint8)
 
         return self._viterbi_decode(emissions, mask)
 
-    def _compute_joint_llh(self,
-                           emissions: torch.Tensor,
-                           tags: torch.LongTensor,
-                           mask: torch.ByteTensor) -> torch.Tensor:
+    def _compute_joint_llh(
+            self, emissions: torch.Tensor, tags: torch.LongTensor,
+            mask: torch.ByteTensor) -> torch.Tensor:
         # emissions: (seq_length, batch_size, num_tags)
         # tags: (seq_length, batch_size)
         # mask: (seq_length, batch_size)
@@ -170,13 +165,13 @@ class CRF(nn.Module):
         llh = self.start_transitions[tags[0]]  # (batch_size,)
 
         for i in range(seq_length - 1):
-            cur_tag, next_tag = tags[i], tags[i+1]
+            cur_tag, next_tag = tags[i], tags[i + 1]
             # Emission score for current tag
             llh += emissions[i].gather(1, cur_tag.view(-1, 1)).squeeze(1) * mask[i]
             # Transition score to next tag
             transition_score = self.transitions[cur_tag, next_tag]
             # Only add transition score if the next tag is not masked (mask == 1)
-            llh += transition_score * mask[i+1]
+            llh += transition_score * mask[i + 1]
 
         # Find last tag index
         last_tag_indices = mask.long().sum(0) - 1  # (batch_size,)
@@ -189,9 +184,8 @@ class CRF(nn.Module):
 
         return llh
 
-    def _compute_log_partition_function(self,
-                                        emissions: torch.Tensor,
-                                        mask: torch.ByteTensor) -> torch.Tensor:
+    def _compute_log_partition_function(
+            self, emissions: torch.Tensor, mask: torch.ByteTensor) -> torch.Tensor:
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and mask.dim() == 2
@@ -222,7 +216,7 @@ class CRF(nn.Module):
             score = torch.logsumexp(score, 1)  # (batch_size, num_tags)
             # Set log_prob to the score if this timestep is valid (mask == 1), otherwise
             # leave it alone
-            log_prob = score * mask[i].unsqueeze(1) + log_prob * (1.-mask[i]).unsqueeze(1)
+            log_prob = score * mask[i].unsqueeze(1) + log_prob * (1. - mask[i]).unsqueeze(1)
 
         # End transition score
         log_prob += self.end_transitions.view(1, -1)
