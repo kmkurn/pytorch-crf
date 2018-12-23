@@ -18,6 +18,8 @@ class CRF(nn.Module):
     ---------
     num_tags : int
         Number of tags.
+    batch_first : bool, optional
+        Whether the first dimension corresponds to the size of a minibatch.
 
     Attributes
     ----------
@@ -38,11 +40,12 @@ class CRF(nn.Module):
     .. _Viterbi algorithm: https://en.wikipedia.org/wiki/Viterbi_algorithm
     """
 
-    def __init__(self, num_tags: int) -> None:
+    def __init__(self, num_tags: int, batch_first: bool = False) -> None:
         if num_tags <= 0:
             raise ValueError(f'invalid number of tags: {num_tags}')
         super().__init__()
         self.num_tags = num_tags
+        self.batch_first = batch_first
         self.start_transitions = nn.Parameter(torch.empty(num_tags))
         self.end_transitions = nn.Parameter(torch.empty(num_tags))
         self.transitions = nn.Parameter(torch.empty(num_tags, num_tags))
@@ -74,12 +77,15 @@ class CRF(nn.Module):
         Arguments
         ---------
         emissions : :class:`~torch.Tensor`
-            Emission score tensor of size ``(seq_length, batch_size, num_tags)``.
+            Emission score tensor of size ``(seq_length, batch_size, num_tags)`` if
+            ``batch_first`` is ``False``, ``(batch_size, seq_length, num_tags)`` otherwise.
         tags : :class:`~torch.LongTensor`
-            Sequence of tags tensor of size ``(seq_length, batch_size)``.
+            Sequence of tags tensor of size ``(seq_length, batch_size)`` if
+            ``batch_first`` is ``False``, ``(batch_size, seq_length)`` otherwise.
         mask : :class:`~torch.ByteTensor`, optional
-            Mask tensor of size ``(seq_length, batch_size)``.
-        reduce : bool
+            Mask tensor of size ``(seq_length, batch_size)`` if ``batch_first`` is ``False``,
+            ``(batch_size, seq_length)`` otherwise.
+        reduce : bool, optional
             Whether to sum the log likelihood over the batch.
 
         Returns
@@ -111,6 +117,11 @@ class CRF(nn.Module):
         if mask is None:
             mask = torch.ones_like(tags, dtype=torch.uint8)
 
+        if self.batch_first:
+            emissions = emissions.transpose(0, 1)
+            tags = tags.transpose(0, 1)
+            mask = mask.transpose(0, 1)
+
         # shape: (batch_size,)
         numerator = self._compute_score(emissions, tags, mask)
         # shape: (batch_size,)
@@ -127,9 +138,11 @@ class CRF(nn.Module):
         Arguments
         ---------
         emissions : :class:`~torch.Tensor`
-            Emission score tensor of size ``(seq_length, batch_size, num_tags)``.
-        mask : :class:`~torch.ByteTensor`
-            Mask tensor of size ``(seq_length, batch_size)``.
+            Emission score tensor of size ``(seq_length, batch_size, num_tags)`` if
+            ``batch_first`` is ``False``, ``(batch_size, seq_length, num_tags)`` otherwise.
+        mask : :class:`~torch.ByteTensor`, optional
+            Mask tensor of size ``(seq_length, batch_size)`` if ``batch_first`` is ``False``,
+            ``(batch_size, seq_length)`` otherwise.
 
         Returns
         -------
@@ -149,6 +162,10 @@ class CRF(nn.Module):
 
         if mask is None:
             mask = emissions.new_ones(emissions.shape[:2], dtype=torch.uint8)
+
+        if self.batch_first:
+            emissions = emissions.transpose(0, 1)
+            mask = mask.transpose(0, 1)
 
         return self._viterbi_decode(emissions, mask)
 

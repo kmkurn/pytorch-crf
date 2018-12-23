@@ -35,8 +35,8 @@ def compute_score(crf, emission, tag):
     return score
 
 
-def make_crf(num_tags=5):
-    return CRF(num_tags)
+def make_crf(num_tags=5, batch_first=False):
+    return CRF(num_tags, batch_first=batch_first)
 
 
 def make_emissions(seq_length=3, batch_size=2, num_tags=5):
@@ -58,6 +58,7 @@ class TestInit(object):
 
         # TODO change .size() to shape?
         assert crf.num_tags == num_tags
+        assert not crf.batch_first
         assert isinstance(crf.start_transitions, nn.Parameter)
         assert crf.start_transitions.size() == (num_tags, )
         assert isinstance(crf.end_transitions, nn.Parameter)
@@ -65,6 +66,10 @@ class TestInit(object):
         assert isinstance(crf.transitions, nn.Parameter)
         assert crf.transitions.size() == (num_tags, num_tags)
         assert repr(crf) == f'CRF(num_tags={num_tags})'
+
+    def test_full(self):
+        crf = CRF(10, batch_first=True)
+        assert crf.batch_first
 
     def test_nonpositive_num_tags(self):
         with pytest.raises(ValueError) as excinfo:
@@ -186,6 +191,29 @@ class TestForward(object):
 
         for llh_, manual_llh_ in zip(llh, manual_llh):
             assert llh_.item() == approx(manual_llh_)
+
+    def test_batch_first(self):
+        crf = make_crf()
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(num_tags=crf.num_tags)
+        # shape: (seq_length, batch_size)
+        tags = make_tags(num_tags=crf.num_tags)
+        llh = crf(emissions, tags)
+
+        crf_bf = make_crf(batch_first=True)
+        # Copy parameter values from non-batch-first CRF; requires_grad must be False
+        # to avoid runtime error of in-place operation on a leaf variable
+        crf_bf.start_transitions.requires_grad_(False).copy_(crf.start_transitions)
+        crf_bf.end_transitions.requires_grad_(False).copy_(crf.end_transitions)
+        crf_bf.transitions.requires_grad_(False).copy_(crf.transitions)
+
+        # shape: (batch_size, seq_length, num_tags)
+        emissions = emissions.transpose(0, 1)
+        # shape: (batch_size, seq_length)
+        tags = tags.transpose(0, 1)
+        llh_bf = crf_bf(emissions, tags)
+
+        assert llh.item() == approx(llh_bf.item())
 
     def test_emissions_has_bad_number_of_dimension(self):
         emissions = torch.randn(1, 2, requires_grad=True)
@@ -321,6 +349,25 @@ class TestDecode(object):
         batched = crf.decode(emissions, mask=mask)
 
         assert non_batched == batched
+
+    def test_batch_first(self):
+        crf = make_crf()
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(num_tags=crf.num_tags)
+        best_tags = crf.decode(emissions)
+
+        crf_bf = make_crf(batch_first=True)
+        # Copy parameter values from non-batch-first CRF; requires_grad must be False
+        # to avoid runtime error of in-place operation on a leaf variable
+        crf_bf.start_transitions.requires_grad_(False).copy_(crf.start_transitions)
+        crf_bf.end_transitions.requires_grad_(False).copy_(crf.end_transitions)
+        crf_bf.transitions.requires_grad_(False).copy_(crf.transitions)
+
+        # shape: (batch_size, seq_length, num_tags)
+        emissions = emissions.transpose(0, 1)
+        best_tags_bf = crf_bf.decode(emissions)
+
+        assert best_tags == best_tags_bf
 
     def test_emissions_has_bad_number_of_dimension(self):
         emissions = torch.randn(1, 2)
