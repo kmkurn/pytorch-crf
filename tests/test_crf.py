@@ -115,11 +115,7 @@ class TestForward:
         # shape: (seq_length, batch_size)
         tags = make_tags(crf, seq_length, batch_size)
         # mask should have size of (seq_length, batch_size)
-        mask = torch.tensor([
-            [1, 1],
-            [1, 1],
-            [1, 0],
-        ], dtype=torch.uint8)
+        mask = torch.tensor([[1, 1, 1], [1, 1, 0]], dtype=torch.uint8).transpose(0, 1)
 
         # shape: ()
         llh = crf(emissions, tags, mask=mask)
@@ -306,11 +302,7 @@ class TestDecode:
         # shape: (seq_length, batch_size, num_tags)
         emissions = make_emissions(crf, seq_length, batch_size)
         # mask should be (seq_length, batch_size)
-        mask = torch.tensor([
-            [1, 1],
-            [1, 1],
-            [1, 0],
-        ], dtype=torch.uint8)
+        mask = torch.tensor([[1, 1, 1], [1, 1, 0]], dtype=torch.uint8).transpose(0, 1)
 
         best_tags = crf.decode(emissions, mask=mask)
 
