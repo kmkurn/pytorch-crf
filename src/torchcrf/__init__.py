@@ -109,7 +109,7 @@ class CRF(nn.Module):
                 raise ValueError(
                     f'size of tags and mask must match, got {tuple(tags.shape)} '
                     f'and {tuple(mask.shape)}')
-            if not all(mask[0]):
+            if not all(mask[0]):  # TODO(BUG) fix this when batch_first=True
                 raise ValueError('mask of the first timestep must all be on')
 
         if mask is None:
@@ -157,6 +157,7 @@ class CRF(nn.Module):
             raise ValueError(
                 'the first two dimensions of emissions and mask must match, '
                 f'got {tuple(emissions.shape[:2])} and {tuple(mask.shape)}')
+            # TODO assert for mask's first timestep
 
         if mask is None:
             mask = emissions.new_ones(emissions.shape[:2], dtype=torch.uint8)
