@@ -3,8 +3,6 @@ from typing import List, Optional
 import torch
 import torch.nn as nn
 
-# TODO change .size() to shape?
-
 
 class CRF(nn.Module):
     """Conditional random field.
@@ -98,19 +96,19 @@ class CRF(nn.Module):
             raise ValueError(f'emissions must have dimension of 3, got {emissions.dim()}')
         if tags.dim() != 2:
             raise ValueError(f'tags must have dimension of 2, got {tags.dim()}')
-        if emissions.size()[:2] != tags.size():
+        if emissions.shape[:2] != tags.shape:
             raise ValueError(
                 'the first two dimensions of emissions and tags must match, '
-                f'got {tuple(emissions.size()[:2])} and {tuple(tags.size())}')
+                f'got {tuple(emissions.shape[:2])} and {tuple(tags.shape)}')
         if emissions.size(2) != self.num_tags:
             raise ValueError(
                 f'expected last dimension of emissions is {self.num_tags}, '
                 f'got {emissions.size(2)}')
         if mask is not None:
-            if tags.size() != mask.size():
+            if tags.shape != mask.shape:
                 raise ValueError(
-                    f'size of tags and mask must match, got {tuple(tags.size())} '
-                    f'and {tuple(mask.size())}')
+                    f'size of tags and mask must match, got {tuple(tags.shape)} '
+                    f'and {tuple(mask.shape)}')
             if not all(mask[0]):
                 raise ValueError('mask of the first timestep must all be on')
 
@@ -155,10 +153,10 @@ class CRF(nn.Module):
             raise ValueError(
                 f'expected last dimension of emissions is {self.num_tags}, '
                 f'got {emissions.size(2)}')
-        if mask is not None and emissions.size()[:2] != mask.size():
+        if mask is not None and emissions.shape[:2] != mask.shape:
             raise ValueError(
                 'the first two dimensions of emissions and mask must match, '
-                f'got {tuple(emissions.size()[:2])} and {tuple(mask.size())}')
+                f'got {tuple(emissions.shape[:2])} and {tuple(mask.shape)}')
 
         if mask is None:
             mask = emissions.new_ones(emissions.shape[:2], dtype=torch.uint8)
@@ -176,9 +174,9 @@ class CRF(nn.Module):
         # tags: (seq_length, batch_size)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and tags.dim() == 2
-        assert emissions.size()[:2] == tags.size()
+        assert emissions.shape[:2] == tags.shape
         assert emissions.size(2) == self.num_tags
-        assert mask.size() == tags.size()
+        assert mask.shape == tags.shape
         assert all(mask[0])  # TODO use .all()
 
         seq_length = emissions.size(0)
@@ -229,7 +227,7 @@ class CRF(nn.Module):
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and mask.dim() == 2
-        assert emissions.size()[:2] == mask.size()
+        assert emissions.shape[:2] == mask.shape
         assert emissions.size(2) == self.num_tags
         assert all(mask[0])  # TODO use .all()
 

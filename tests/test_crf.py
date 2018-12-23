@@ -54,15 +54,14 @@ class TestInit:
         num_tags = 10
         crf = CRF(num_tags)
 
-        # TODO change .size() to shape?
         assert crf.num_tags == num_tags
         assert not crf.batch_first
         assert isinstance(crf.start_transitions, nn.Parameter)
-        assert crf.start_transitions.size() == (num_tags, )
+        assert crf.start_transitions.shape == (num_tags, )
         assert isinstance(crf.end_transitions, nn.Parameter)
-        assert crf.end_transitions.size() == (num_tags, )
+        assert crf.end_transitions.shape == (num_tags, )
         assert isinstance(crf.transitions, nn.Parameter)
-        assert crf.transitions.size() == (num_tags, num_tags)
+        assert crf.transitions.shape == (num_tags, num_tags)
         assert repr(crf) == f'CRF(num_tags={num_tags})'
 
     def test_full(self):
@@ -87,7 +86,7 @@ class TestForward:
 
         llh = crf(emissions, tags)
         assert torch.is_tensor(llh)
-        assert llh.size() == ()
+        assert llh.shape == ()
 
         total_llh = 0.
         for i in range(batch_size):
@@ -148,7 +147,7 @@ class TestForward:
         # shape: (seq_length, batch_size)
         tags = make_tags(num_tags=crf.num_tags)
 
-        seq_length, batch_size = tags.size()
+        seq_length, batch_size = tags.shape
 
         llh_no_mask = crf(emissions, tags)
         # No mask means the mask is all ones
@@ -164,12 +163,12 @@ class TestForward:
         # shape: (seq_length, batch_size)
         tags = make_tags(num_tags=crf.num_tags)
 
-        seq_length, batch_size = tags.size()
+        seq_length, batch_size = tags.shape
 
         llh = crf(emissions, tags, reduce=False)
 
         assert torch.is_tensor(llh)
-        assert llh.size() == (batch_size, )
+        assert llh.shape == (batch_size, )
 
         # shape: (batch_size, seq_length, num_tags)
         emissions = emissions.transpose(0, 1)
