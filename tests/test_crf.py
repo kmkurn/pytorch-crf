@@ -14,14 +14,13 @@ RANDOM_SEED = 1478754
 random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 
-# TODO get rid of (object) in class names
-
 
 def compute_score(crf, emission, tag):
     # emission: (seq_length, num_tags)
-    # tag: (seq_length,)
-    # TODO more asserts on sizes etc.
-    assert len(emission) == len(tag)
+    assert emission.dim() == 2
+    assert emission.size(0) == len(tag)
+    assert emission.size(1) == crf.num_tags
+    assert all(0 <= t < crf.num_tags for t in tag)
 
     # Add transitions score
     score = crf.start_transitions[tag[0]] + crf.end_transitions[tag[-1]]
@@ -40,8 +39,7 @@ def make_crf(num_tags=5, batch_first=False):
 
 
 def make_emissions(seq_length=3, batch_size=2, num_tags=5):
-    # TODO check if requires_grad=False is ok
-    return torch.randn(seq_length, batch_size, num_tags, requires_grad=True)
+    return torch.randn(seq_length, batch_size, num_tags)
 
 
 def make_tags(seq_length=3, batch_size=2, num_tags=5):
@@ -51,7 +49,7 @@ def make_tags(seq_length=3, batch_size=2, num_tags=5):
         dtype=torch.long)
 
 
-class TestInit(object):
+class TestInit:
     def test_minimal(self):
         num_tags = 10
         crf = CRF(num_tags)
@@ -77,7 +75,7 @@ class TestInit(object):
         assert 'invalid number of tags: 0' in str(excinfo.value)
 
 
-class TestForward(object):
+class TestForward:
     def test_batched_loss_is_correct(self):
         crf = make_crf()
         batch_size = 10
@@ -216,7 +214,7 @@ class TestForward(object):
         assert llh.item() == approx(llh_bf.item())
 
     def test_emissions_has_bad_number_of_dimension(self):
-        emissions = torch.randn(1, 2, requires_grad=True)
+        emissions = torch.randn(1, 2)
         tags = torch.empty(2, 2, dtype=torch.long)
         crf = make_crf()
 
@@ -225,7 +223,7 @@ class TestForward(object):
         assert 'emissions must have dimension of 3, got 2' in str(excinfo.value)
 
     def test_tags_has_bad_number_of_dimension(self):
-        emissions = torch.randn(1, 2, 3, requires_grad=True)
+        emissions = torch.randn(1, 2, 3)
         tags = torch.empty(2, 2, 2, dtype=torch.long)
         crf = make_crf(3)
 
@@ -234,7 +232,7 @@ class TestForward(object):
         assert 'tags must have dimension of 2, got 3' in str(excinfo.value)
 
     def test_emissions_and_tags_size_mismatch(self):
-        emissions = torch.randn(1, 2, 3, requires_grad=True)
+        emissions = torch.randn(1, 2, 3)
         tags = torch.empty(2, 2, dtype=torch.long)
         crf = make_crf(3)
 
@@ -245,7 +243,7 @@ class TestForward(object):
             'got (1, 2) and (2, 2)') in str(excinfo.value)
 
     def test_emissions_last_dimension_not_equal_to_number_of_tags(self):
-        emissions = torch.randn(1, 2, 3, requires_grad=True)
+        emissions = torch.randn(1, 2, 3)
         tags = torch.empty(1, 2, dtype=torch.long)
         crf = make_crf(10)
 
@@ -254,7 +252,7 @@ class TestForward(object):
         assert 'expected last dimension of emissions is 10, got 3' in str(excinfo.value)
 
     def test_mask_and_tags_size_mismatch(self):
-        emissions = torch.randn(1, 2, 3, requires_grad=True)
+        emissions = torch.randn(1, 2, 3)
         tags = torch.empty(1, 2, dtype=torch.long)
         mask = torch.tensor([[1], [1]], dtype=torch.uint8)
         crf = make_crf(3)
@@ -264,7 +262,7 @@ class TestForward(object):
         assert 'size of tags and mask must match, got (1, 2) and (2, 1)' in str(excinfo.value)
 
     def test_first_timestep_mask_is_not_all_on(self):
-        emissions = torch.randn(1, 2, 3, requires_grad=True)
+        emissions = torch.randn(1, 2, 3)
         tags = torch.empty(1, 2, dtype=torch.long)
         mask = torch.tensor([[0, 1]], dtype=torch.uint8)
         crf = make_crf(3)
@@ -274,7 +272,7 @@ class TestForward(object):
         assert 'mask of the first timestep must all be on' in str(excinfo.value)
 
 
-class TestDecode(object):
+class TestDecode:
     def test_works_without_mask(self):
         crf = make_crf()
         # shape: (seq_length, batch_size, num_tags)
