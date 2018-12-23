@@ -82,30 +82,6 @@ class TestInit:
 
 
 class TestForward:
-    def test_batched_loss_is_correct(self):
-        crf = make_crf()
-        batch_size = 10
-
-        # shape: (seq_length, batch_size, num_tags)
-        emissions = make_emissions(crf, batch_size=batch_size)
-        # shape: (seq_length, batch_size)
-        tags = make_tags(crf, batch_size=batch_size)
-
-        llh = crf(emissions, tags)
-        assert torch.is_tensor(llh)
-        assert llh.shape == ()
-
-        total_llh = 0.
-        for i in range(batch_size):
-            # shape: (seq_length, 1, num_tags)
-            emissions_ = emissions[:, i, :].unsqueeze(1)
-            # shape: (seq_length, 1)
-            tags_ = tags[:, i].unsqueeze(1)
-            # shape: ()
-            total_llh += crf(emissions_, tags_)
-
-        assert llh.item() == approx(total_llh.item())
-
     def test_works_with_mask(self):
         crf = make_crf()
         seq_length, batch_size = 3, 2
@@ -150,14 +126,35 @@ class TestForward:
         # shape: (seq_length, batch_size)
         tags = make_tags(crf)
 
-        seq_length, batch_size = tags.shape
-
         llh_no_mask = crf(emissions, tags)
         # No mask means the mask is all ones
-        mask = torch.ones(seq_length, batch_size).byte()
-        llh_mask = crf(emissions, tags, mask=mask)
+        llh_mask = crf(emissions, tags, mask=torch.ones_like(tags).byte())
 
         assert llh_no_mask.item() == approx(llh_mask.item())
+
+    def test_batched_loss(self):
+        crf = make_crf()
+        batch_size = 10
+
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(crf, batch_size=batch_size)
+        # shape: (seq_length, batch_size)
+        tags = make_tags(crf, batch_size=batch_size)
+
+        llh = crf(emissions, tags)
+        assert torch.is_tensor(llh)
+        assert llh.shape == ()
+
+        total_llh = 0.
+        for i in range(batch_size):
+            # shape: (seq_length, 1, num_tags)
+            emissions_ = emissions[:, i, :].unsqueeze(1)
+            # shape: (seq_length, 1)
+            tags_ = tags[:, i].unsqueeze(1)
+            # shape: ()
+            total_llh += crf(emissions_, tags_)
+
+        assert llh.item() == approx(total_llh.item())
 
     def test_not_summed_over_batch(self):
         crf = make_crf()
@@ -275,26 +272,6 @@ class TestForward:
 
 
 class TestDecode:
-    def test_works_without_mask(self):
-        crf = make_crf()
-        # shape: (seq_length, batch_size, num_tags)
-        emissions = make_emissions(crf)
-
-        seq_length = emissions.size(0)
-
-        best_tags = crf.decode(emissions)
-
-        # shape: (batch_size, seq_length, num_tags)
-        emissions = emissions.transpose(0, 1)
-
-        # Compute best tag manually
-        for emission, best_tag in zip(emissions, best_tags):
-            assert all(isinstance(t, int) for t in best_tag)
-            manual_best_tag = max(
-                itertools.product(range(crf.num_tags), repeat=seq_length),
-                key=lambda t: compute_score(crf, emission, t))
-            assert tuple(best_tag) == manual_best_tag
-
     def test_works_with_mask(self):
         crf = make_crf()
         seq_length, batch_size = 3, 2
@@ -322,27 +299,39 @@ class TestDecode:
                 key=lambda t: compute_score(crf, emission, t))
             assert tuple(best_tag) == manual_best_tag
 
+    def test_works_without_mask(self):
+        crf = make_crf()
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(crf)
+
+        best_tags_no_mask = crf.decode(emissions)
+        # No mask means mask is all ones
+        best_tags_mask = crf.decode(
+            emissions, mask=emissions.new_ones(emissions.shape[:2]).byte())
+
+        assert best_tags_no_mask == best_tags_mask
+
     def test_batched_decode(self):
-        batch_size, seq_len, num_tags = 2, 3, 4
-        crf = CRF(num_tags)
+        crf = make_crf()
+        batch_size, seq_length = 2, 3
 
         # shape: (seq_length, batch_size, num_tags)
-        emissions = torch.randn(seq_len, batch_size, num_tags)
+        emissions = make_emissions(crf, seq_length, batch_size)
         # shape: (seq_length, batch_size)
         mask = torch.tensor([[1, 1, 1], [1, 1, 0]], dtype=torch.uint8).transpose(0, 1)
 
+        batched = crf.decode(emissions, mask=mask)
+
         non_batched = []
-        for emissions_, mask_ in zip(emissions.transpose(0, 1), mask.transpose(0, 1)):
+        for i in range(batch_size):
             # shape: (seq_length, 1, num_tags)
-            emissions_ = emissions_.unsqueeze(1)
+            emissions_ = emissions[:, i, :].unsqueeze(1)
             # shape: (seq_length, 1)
-            mask_ = mask_.unsqueeze(1)
+            mask_ = mask[:, i].unsqueeze(1)
 
             result = crf.decode(emissions_, mask=mask_)
             assert len(result) == 1
             non_batched.append(result[0])
-
-        batched = crf.decode(emissions, mask=mask)
 
         assert non_batched == batched
 
