@@ -3,6 +3,8 @@ from typing import List, Optional
 import torch
 import torch.nn as nn
 
+# TODO change .size() to shape?
+
 
 class CRF(nn.Module):
     """Conditional random field.
