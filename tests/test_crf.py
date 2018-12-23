@@ -38,15 +38,22 @@ def make_crf(num_tags=5, batch_first=False):
     return CRF(num_tags, batch_first=batch_first)
 
 
-def make_emissions(seq_length=3, batch_size=2, num_tags=5):
-    return torch.randn(seq_length, batch_size, num_tags)
+def make_emissions(crf, seq_length=3, batch_size=2):
+    em = torch.randn(seq_length, batch_size, crf.num_tags)
+    if crf.batch_first:
+        em = em.transpose(0, 1)
+    return em
 
 
-def make_tags(seq_length=3, batch_size=2, num_tags=5):
+def make_tags(crf, seq_length=3, batch_size=2):
     # shape: (seq_length, batch_size)
-    return torch.tensor(
-        [[random.randrange(num_tags) for b in range(batch_size)] for _ in range(seq_length)],
-        dtype=torch.long)
+    ts = torch.tensor([[random.randrange(crf.num_tags)
+                        for b in range(batch_size)]
+                       for _ in range(seq_length)],
+                      dtype=torch.long)
+    if crf.batch_first:
+        ts = ts.transpose(0, 1)
+    return ts
 
 
 class TestInit:
@@ -80,9 +87,9 @@ class TestForward:
         batch_size = 10
 
         # shape: (seq_length, batch_size, num_tags)
-        emissions = make_emissions(batch_size=batch_size, num_tags=crf.num_tags)
+        emissions = make_emissions(crf, batch_size=batch_size)
         # shape: (seq_length, batch_size)
-        tags = make_tags(batch_size=batch_size, num_tags=crf.num_tags)
+        tags = make_tags(crf, batch_size=batch_size)
 
         llh = crf(emissions, tags)
         assert torch.is_tensor(llh)
@@ -104,9 +111,9 @@ class TestForward:
         seq_length, batch_size = 3, 2
 
         # shape: (seq_length, batch_size, num_tags)
-        emissions = make_emissions(seq_length, batch_size, crf.num_tags)
+        emissions = make_emissions(crf, seq_length, batch_size)
         # shape: (seq_length, batch_size)
-        tags = make_tags(seq_length, batch_size, crf.num_tags)
+        tags = make_tags(crf, seq_length, batch_size)
         # mask should have size of (seq_length, batch_size)
         mask = torch.tensor([
             [1, 1],
@@ -143,9 +150,9 @@ class TestForward:
     def test_works_without_mask(self):
         crf = make_crf()
         # shape: (seq_length, batch_size, num_tags)
-        emissions = make_emissions(num_tags=crf.num_tags)
+        emissions = make_emissions(crf)
         # shape: (seq_length, batch_size)
-        tags = make_tags(num_tags=crf.num_tags)
+        tags = make_tags(crf)
 
         seq_length, batch_size = tags.shape
 
@@ -159,9 +166,9 @@ class TestForward:
     def test_not_summed_over_batch(self):
         crf = make_crf()
         # shape: (seq_length, batch_size, num_tags)
-        emissions = make_emissions(num_tags=crf.num_tags)
+        emissions = make_emissions(crf)
         # shape: (seq_length, batch_size)
-        tags = make_tags(num_tags=crf.num_tags)
+        tags = make_tags(crf)
 
         seq_length, batch_size = tags.shape
 
@@ -192,9 +199,9 @@ class TestForward:
     def test_batch_first(self):
         crf = make_crf()
         # shape: (seq_length, batch_size, num_tags)
-        emissions = make_emissions(num_tags=crf.num_tags)
+        emissions = make_emissions(crf)
         # shape: (seq_length, batch_size)
-        tags = make_tags(num_tags=crf.num_tags)
+        tags = make_tags(crf)
         llh = crf(emissions, tags)
 
         crf_bf = make_crf(batch_first=True)
@@ -275,7 +282,7 @@ class TestDecode:
     def test_works_without_mask(self):
         crf = make_crf()
         # shape: (seq_length, batch_size, num_tags)
-        emissions = make_emissions(num_tags=crf.num_tags)
+        emissions = make_emissions(crf)
 
         seq_length = emissions.size(0)
 
@@ -297,7 +304,7 @@ class TestDecode:
         seq_length, batch_size = 3, 2
 
         # shape: (seq_length, batch_size, num_tags)
-        emissions = make_emissions(seq_length, batch_size, crf.num_tags)
+        emissions = make_emissions(crf, seq_length, batch_size)
         # mask should be (seq_length, batch_size)
         mask = torch.tensor([
             [1, 1],
@@ -350,7 +357,7 @@ class TestDecode:
     def test_batch_first(self):
         crf = make_crf()
         # shape: (seq_length, batch_size, num_tags)
-        emissions = make_emissions(num_tags=crf.num_tags)
+        emissions = make_emissions(crf)
         best_tags = crf.decode(emissions)
 
         crf_bf = make_crf(batch_first=True)
