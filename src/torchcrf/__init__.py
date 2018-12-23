@@ -67,14 +67,14 @@ class CRF(nn.Module):
             mask: Optional[torch.ByteTensor] = None,
             reduce: bool = True,
     ) -> torch.Tensor:
-        """Compute the log likelihood of the given sequence of tags and emission score.
+        """Compute the conditional log likelihood of a sequence of tags given emission scores.
 
         Arguments
         ---------
         emissions : :class:`~torch.Tensor`
             Emission score tensor of size ``(seq_length, batch_size, num_tags)``.
         tags : :class:`~torch.LongTensor`
-            Sequence of tags of size ``(seq_length, batch_size)``.
+            Sequence of tags tensor of size ``(seq_length, batch_size)``.
         mask : :class:`~torch.ByteTensor`, optional
             Mask tensor of size ``(seq_length, batch_size)``.
         reduce : bool
@@ -83,7 +83,7 @@ class CRF(nn.Module):
         Returns
         -------
         :class:`~torch.Tensor`
-            The log likelihood. This will have size (1,) if ``reduce=True``, ``(batch_size,)``
+            The log likelihood. This will have size () if ``reduce=True``, ``(batch_size,)``
             otherwise.
         """
         if emissions.dim() != 3:
@@ -109,9 +109,13 @@ class CRF(nn.Module):
         if mask is None:
             mask = torch.ones_like(tags, dtype=torch.uint8)
 
-        numerator = self._compute_joint_llh(emissions, tags, mask)
-        denominator = self._compute_log_partition_function(emissions, mask)
+        # shape: (batch_size,)
+        numerator = self._compute_score(emissions, tags, mask)
+        # shape: (batch_size,)
+        denominator = self._compute_normalizer(emissions, mask)
+        # shape: (batch_size,)
         llh = numerator - denominator
+
         return llh if not reduce else torch.sum(llh)
 
     def decode(self, emissions: torch.Tensor,
@@ -146,7 +150,7 @@ class CRF(nn.Module):
 
         return self._viterbi_decode(emissions, mask)
 
-    def _compute_joint_llh(
+    def _compute_score(
             self, emissions: torch.Tensor, tags: torch.LongTensor,
             mask: torch.ByteTensor) -> torch.Tensor:
         # emissions: (seq_length, batch_size, num_tags)
@@ -156,92 +160,126 @@ class CRF(nn.Module):
         assert emissions.size()[:2] == tags.size()
         assert emissions.size(2) == self.num_tags
         assert mask.size() == tags.size()
-        assert all(mask[0])
+        assert all(mask[0])  # TODO use .all()
 
         seq_length = emissions.size(0)
         mask = mask.float()
 
         # Start transition score
-        llh = self.start_transitions[tags[0]]  # (batch_size,)
+        # shape: (batch_size,)
+        llh = self.start_transitions[tags[0]]
 
         for i in range(seq_length - 1):
+            # shape: (batch_size,)
             cur_tag, next_tag = tags[i], tags[i + 1]
+
             # Emission score for current tag
+            # shape: (batch_size,)
+            # TODO use advanced indexing
             llh += emissions[i].gather(1, cur_tag.view(-1, 1)).squeeze(1) * mask[i]
+
             # Transition score to next tag
+            # shape: (batch_size,)
             transition_score = self.transitions[cur_tag, next_tag]
+
             # Only add transition score if the next tag is not masked (mask == 1)
+            # shape: (batch_size,)
             llh += transition_score * mask[i + 1]
 
         # Find last tag index
-        last_tag_indices = mask.long().sum(0) - 1  # (batch_size,)
+        # shape: (batch_size,)
+        last_tag_indices = mask.long().sum(0) - 1
+        # shape: (batch_size,)
+        # TODO use advanced indexing
         last_tags = tags.gather(0, last_tag_indices.view(1, -1)).squeeze(0)
 
         # End transition score
+        # shape: (batch_size,)
         llh += self.end_transitions[last_tags]
-        # Emission score for the last tag, if mask is valid (mask == 1)
+
+        # Emission score for the tag in position (seq_length - 1), if mask is valid (mask == 1)
+        # shape: (batch_size,)
+        # TODO use advanced indexing
+        # TODO check if last_tags can be replaced by tags[-1]
         llh += emissions[-1].gather(1, last_tags.view(-1, 1)).squeeze(1) * mask[-1]
 
         return llh
 
-    def _compute_log_partition_function(
+    def _compute_normalizer(
             self, emissions: torch.Tensor, mask: torch.ByteTensor) -> torch.Tensor:
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and mask.dim() == 2
         assert emissions.size()[:2] == mask.size()
         assert emissions.size(2) == self.num_tags
-        assert all(mask[0])
+        assert all(mask[0])  # TODO use .all()
 
         seq_length = emissions.size(0)
         mask = mask.float()
 
         # Start transition score and first emission
+        # shape: (batch_size, num_tags)
+        # log_prob has size of (batch_size, num_tags) where for each batch,
+        # the j-th column stores the log probability that the first timestep has tag j
         log_prob = self.start_transitions.view(1, -1) + emissions[0]
-        # Here, log_prob has size (batch_size, num_tags) where for each batch,
-        # the j-th column stores the log probability that the current timestep has tag j
 
         for i in range(1, seq_length):
             # Broadcast log_prob over all possible next tags
-            broadcast_log_prob = log_prob.unsqueeze(2)  # (batch_size, num_tags, 1)
+            # shape: (batch_size, num_tags, 1)
+            broadcast_log_prob = log_prob.unsqueeze(2)
+
             # Broadcast transition score over all instances in the batch
-            broadcast_transitions = self.transitions.unsqueeze(0)  # (1, num_tags, num_tags)
+            # shape: (1, num_tags, num_tags)
+            # TODO no need to broadcast explicitly bc this is the default
+            broadcast_transitions = self.transitions.unsqueeze(0)
+
             # Broadcast emission score over all possible current tags
-            broadcast_emissions = emissions[i].unsqueeze(1)  # (batch_size, 1, num_tags)
-            # Sum current log probability, transition, and emission scores
-            score = broadcast_log_prob + broadcast_transitions \
-                + broadcast_emissions  # (batch_size, num_tags, num_tags)
+            # shape: (batch_size, 1, num_tags)
+            broadcast_emissions = emissions[i].unsqueeze(1)
+
+            # Sum current log probability, transition, and emission scores: for each sample
+            # in the batch, entry in row i and column j stores the sum of scores of all
+            # possible tag sequences so far, that end with transitioning from tag i to tag j
+            # and emitting
+            # shape: (batch_size, num_tags, num_tags)
+            score = broadcast_log_prob + broadcast_transitions + broadcast_emissions
+
             # Sum over all possible current tags, but we're in log prob space, so a sum
-            # becomes a log-sum-exp
-            score = torch.logsumexp(score, 1)  # (batch_size, num_tags)
+            # becomes a log-sum-exp: for each sample, entry i stores the sum of scores of
+            # all possible tag sequences so far, that end in tag i
+            # shape: (batch_size, num_tags)
+            score = torch.logsumexp(score, 1)
+
             # Set log_prob to the score if this timestep is valid (mask == 1), otherwise
             # leave it alone
+            # shape: (batch_size, num_tags)
             log_prob = score * mask[i].unsqueeze(1) + log_prob * (1. - mask[i]).unsqueeze(1)
 
         # End transition score
+        # shape: (batch_size, num_tags)
         log_prob += self.end_transitions.view(1, -1)
+
         # Sum (log-sum-exp) over all possible tags
-        return torch.logsumexp(log_prob, 1)  # (batch_size,)
+        # shape: (batch_size,)
+        return torch.logsumexp(log_prob, 1)
 
     def _viterbi_decode(self, emissions: torch.FloatTensor, mask: torch.ByteTensor) \
             -> List[List[int]]:
-        # Get input sizes
+        # TODO assert for emissions and mask
         seq_length = emissions.size(0)
         batch_size = emissions.size(1)
-        sequence_lengths = mask.long().sum(dim=0)
 
         # emissions: (seq_length, batch_size, num_tags)
         assert emissions.size(2) == self.num_tags
 
-        # list to store the decoded paths
-        best_tags_list = []
+        # TODO might want to refactor this to closely mimic _compute_normalizer
 
         # Start transition
         viterbi_score = []
         viterbi_score.append(self.start_transitions + emissions[0])
         viterbi_path = []
 
-        # Here, viterbi_score is a list of tensors of shapes of (num_tags,) where value at
+        # viterbi_score is a list of tensors of shapes of (num_tags,) where value at
         # index i stores the score of the best tag sequence so far that ends with tag i
         # viterbi_path saves where the best tags candidate transitioned from; this is used
         # when we trace back the best tag sequence
@@ -250,20 +288,33 @@ class CRF(nn.Module):
         # for every possible next tag
         for i in range(1, seq_length):
             # Broadcast viterbi score for every possible next tag
+            # shape: (batch_size, num_tags, 1)
             broadcast_score = viterbi_score[i - 1].view(batch_size, -1, 1)
+
             # Broadcast emission score for every possible current tag
+            # shape: (batch_size, 1, num_tags)
             broadcast_emission = emissions[i].view(batch_size, 1, -1)
+
             # Compute the score matrix of shape (batch_size, num_tags, num_tags) where
             # for each sample, each entry at row i and column j stores the score of
             # transitioning from tag i to tag j and emitting
+            # shape: (batch_size, num_tags, num_tags)
             score = broadcast_score + self.transitions + broadcast_emission
+
             # Find the maximum score over all possible current tag
-            best_score, best_path = score.max(1)  # (batch_size,num_tags,)
+            # shape: (batch_size, num_tags)
+            best_score, best_path = score.max(1)
+
             # Save the score and the path
             viterbi_score.append(best_score)
             viterbi_path.append(best_path)
 
         # Now, compute the best path for each sample
+        # shape: (batch_size,)
+        sequence_lengths = mask.long().sum(dim=0)
+        # List to store the decoded paths
+        best_tags_list = []
+
         for idx in range(batch_size):
             # Find the tag which maximizes the score at the last timestep; this is our best tag
             # for the last timestep
@@ -273,6 +324,7 @@ class CRF(nn.Module):
 
             # We trace back where the best last tag comes from, append that to our best tag
             # sequence, and trace it back again, and so on
+            # TODO might wanna use seq_end here
             for path in reversed(viterbi_path[:sequence_lengths[idx] - 1]):
                 best_last_tag = path[idx][best_tags[-1]]
                 best_tags.append(best_last_tag.item())
@@ -280,4 +332,5 @@ class CRF(nn.Module):
             # Reverse the order because we start from the last timestep
             best_tags.reverse()
             best_tags_list.append(best_tags)
+
         return best_tags_list
