@@ -211,6 +211,11 @@ class CRF(nn.Module):
             # shape: (batch_size,)
             llh += transition_score * mask[i + 1]
 
+        # Emission score for the tag in position (seq_length - 1), if mask is valid (mask == 1)
+        # this is needed because the loop doesn't reach (seq_length - 1)
+        # shape: (batch_size,)
+        llh += emissions[-1, torch.arange(batch_size), tags[-1]] * mask[-1]
+
         # End transition score
         # shape: (batch_size,)
         seq_ends = mask.long().sum(dim=0) - 1
@@ -218,12 +223,6 @@ class CRF(nn.Module):
         last_tags = tags[seq_ends, torch.arange(batch_size)]
         # shape: (batch_size,)
         llh += self.end_transitions[last_tags]
-
-        # Emission score for the tag in position (seq_length - 1), if mask is valid (mask == 1)
-        # this is needed because the loop doesn't reach (seq_length - 1)
-        # shape: (batch_size,)
-        # TODO check if last_tags can be replaced by tags[-1]
-        llh += emissions[-1, torch.arange(batch_size), last_tags] * mask[-1]
 
         return llh
 
