@@ -231,24 +231,20 @@ class CRF(nn.Module):
         # (batch_size, num_tags) where for each batch, the j-th column stores
         # the score that the first timestep has tag j
         # shape: (batch_size, num_tags)
-        # TODO no need for .view(1, -1)
-        score = self.start_transitions.view(1, -1) + emissions[0]
+        score = self.start_transitions + emissions[0]
 
         for i in range(1, seq_length):
-            # TODO make comments clearer, see _viterbi_decode
-            # Broadcast score over all possible next tags
+            # Broadcast score for every possible next tag
             # shape: (batch_size, num_tags, 1)
             broadcast_score = score.unsqueeze(2)
 
-            # TODO make comments clearer, see _viterbi_decode
-            # Broadcast emission score over all possible current tags
+            # Broadcast emission score for every possible current tag
             # shape: (batch_size, 1, num_tags)
             broadcast_emissions = emissions[i].unsqueeze(1)
 
-            # TODO make comments clearer, see _viterbi_decode
-            # Sum current log probability, transition, and emission scores: for each sample
-            # in the batch, entry in row i and column j stores the sum of scores of all
-            # possible tag sequences so far, that end with transitioning from tag i to tag j
+            # Compute the score tensor of size (batch_size, num_tags, num_tags) where
+            # for each sample, entry at row i and column j stores the sum of scores of all
+            # possible tag sequences so far that end with transitioning from tag i to tag j
             # and emitting
             # shape: (batch_size, num_tags, num_tags)
             next_score = broadcast_score + self.transitions + broadcast_emissions
@@ -265,8 +261,7 @@ class CRF(nn.Module):
 
         # End transition score
         # shape: (batch_size, num_tags)
-        # TODO no need for .view(1, -1)
-        score += self.end_transitions.view(1, -1)
+        score += self.end_transitions
 
         # Sum (log-sum-exp) over all possible tags
         # shape: (batch_size,)
@@ -306,8 +301,8 @@ class CRF(nn.Module):
             # shape: (batch_size, 1, num_tags)
             broadcast_emission = emissions[i].unsqueeze(1)
 
-            # Compute the score matrix of shape (batch_size, num_tags, num_tags) where
-            # for each sample, each entry at row i and column j stores the score of the best
+            # Compute the score tensor of size (batch_size, num_tags, num_tags) where
+            # for each sample, entry at row i and column j stores the score of the best
             # tag sequence so far that ends with transitioning from tag i to tag j and emitting
             # shape: (batch_size, num_tags, num_tags)
             next_score = broadcast_score + self.transitions + broadcast_emission
