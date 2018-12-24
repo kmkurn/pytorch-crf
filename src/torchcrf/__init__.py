@@ -235,10 +235,10 @@ class CRF(nn.Module):
         seq_length = emissions.size(0)
         mask = mask.float()
 
-        # Start transition score and first emission
+        # Start transition score and first emission; score has size of
+        # (batch_size, num_tags) where for each batch, the j-th column stores
+        # the score that the first timestep has tag j
         # shape: (batch_size, num_tags)
-        # score has size of (batch_size, num_tags) where for each batch,
-        # the j-th column stores the score that the first timestep has tag j
         score = self.start_transitions.view(1, -1) + emissions[0]
 
         for i in range(1, seq_length):
