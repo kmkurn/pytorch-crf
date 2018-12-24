@@ -165,7 +165,7 @@ class TestForward:
 
         seq_length, batch_size = tags.shape
 
-        llh = crf(emissions, tags, reduce=False)
+        llh = crf(emissions, tags, reduction='none')
 
         assert torch.is_tensor(llh)
         assert llh.shape == (batch_size, )
@@ -259,6 +259,15 @@ class TestForward:
         with pytest.raises(ValueError) as excinfo:
             crf(emissions, tags, mask=mask)
         assert 'mask of the first timestep must all be on' in str(excinfo.value)
+
+    def test_invalid_reduction(self):
+        crf = make_crf()
+        emissions = make_emissions(crf)
+        tags = make_tags(crf)
+
+        with pytest.raises(ValueError) as excinfo:
+            crf(emissions, tags, reduction='foo')
+        assert 'invalid reduction: foo' in str(excinfo.value)
 
 
 class TestDecode:

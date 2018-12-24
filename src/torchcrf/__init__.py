@@ -68,7 +68,7 @@ class CRF(nn.Module):
             emissions: torch.Tensor,
             tags: torch.LongTensor,
             mask: Optional[torch.ByteTensor] = None,
-            reduce: bool = True,
+            reduction: str = 'sum',
     ) -> torch.Tensor:
         """Compute the conditional log likelihood of a sequence of tags given emission scores.
 
@@ -83,16 +83,19 @@ class CRF(nn.Module):
         mask : :class:`~torch.ByteTensor`, optional
             Mask tensor of size ``(seq_length, batch_size)`` if ``batch_first`` is ``False``,
             ``(batch_size, seq_length)`` otherwise.
-        reduce : bool, optional
-            Whether to sum the log likelihood over the batch.
+        reduction : str, optional
+            Specifies  the reduction to apply to the output: 'none'|'sum'. 'none': no reduction
+            will be applied. 'sum': the output will be summed over batch.
 
         Returns
         -------
         :class:`~torch.Tensor`
-            The log likelihood. This will have size () if ``reduce=True``, ``(batch_size,)``
-            otherwise.
+            The log likelihood. This will have size ``()`` if reduction is 'sum',
+            ``(batch_size,)`` otherwise.
         """
         self._validate(emissions, tags=tags, mask=mask)
+        if reduction not in ('none', 'sum'):
+            raise ValueError(f'invalid reduction: {reduction}')
         if mask is None:
             mask = torch.ones_like(tags, dtype=torch.uint8)
 
@@ -108,7 +111,7 @@ class CRF(nn.Module):
         # shape: (batch_size,)
         llh = numerator - denominator
 
-        return llh if not reduce else torch.sum(llh)
+        return llh if reduction == 'none' else torch.sum(llh)
 
     def decode(self, emissions: torch.Tensor,
                mask: Optional[torch.ByteTensor] = None) -> List[List[int]]:
