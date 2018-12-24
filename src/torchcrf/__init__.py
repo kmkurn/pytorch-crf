@@ -193,6 +193,7 @@ class CRF(nn.Module):
 
         # Start transition score
         # shape: (batch_size,)
+        # TODO rename llh
         llh = self.start_transitions[tags[0]]
 
         for i in range(seq_length - 1):
@@ -242,6 +243,7 @@ class CRF(nn.Module):
         # shape: (batch_size, num_tags)
         # log_prob has size of (batch_size, num_tags) where for each batch,
         # the j-th column stores the log probability that the first timestep has tag j
+        # TODO rename log_prob
         log_prob = self.start_transitions.view(1, -1) + emissions[0]
 
         for i in range(1, seq_length):
