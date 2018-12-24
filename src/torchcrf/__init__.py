@@ -193,8 +193,7 @@ class CRF(nn.Module):
 
         # Start transition score
         # shape: (batch_size,)
-        # TODO rename llh
-        llh = self.start_transitions[tags[0]]
+        score = self.start_transitions[tags[0]]
 
         for i in range(seq_length - 1):
             # shape: (batch_size,)
@@ -202,7 +201,7 @@ class CRF(nn.Module):
 
             # Emission score for current tag
             # shape: (batch_size,)
-            llh += emissions[i, torch.arange(batch_size), cur_tag] * mask[i]
+            score += emissions[i, torch.arange(batch_size), cur_tag] * mask[i]
 
             # Transition score to next tag
             # shape: (batch_size,)
@@ -210,12 +209,12 @@ class CRF(nn.Module):
 
             # Only add transition score if the next tag is not masked (mask == 1)
             # shape: (batch_size,)
-            llh += transition_score * mask[i + 1]
+            score += transition_score * mask[i + 1]
 
         # Emission score for the tag in position (seq_length - 1), if mask is valid (mask == 1)
         # this is needed because the loop doesn't reach (seq_length - 1)
         # shape: (batch_size,)
-        llh += emissions[-1, torch.arange(batch_size), tags[-1]] * mask[-1]
+        score += emissions[-1, torch.arange(batch_size), tags[-1]] * mask[-1]
 
         # End transition score
         # shape: (batch_size,)
@@ -223,9 +222,9 @@ class CRF(nn.Module):
         # shape: (batch_size,)
         last_tags = tags[seq_ends, torch.arange(batch_size)]
         # shape: (batch_size,)
-        llh += self.end_transitions[last_tags]
+        score += self.end_transitions[last_tags]
 
-        return llh
+        return score
 
     def _compute_normalizer(
             self, emissions: torch.Tensor, mask: torch.ByteTensor) -> torch.Tensor:
