@@ -221,6 +221,45 @@ class TestForward:
 
         assert llh.item() == approx(manual_llh / batch_size)
 
+    def test_reduction_token_mean(self):
+        crf = make_crf()
+        seq_length, batch_size = 3, 2
+
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(crf, seq_length, batch_size)
+        # shape: (seq_length, batch_size)
+        tags = make_tags(crf, seq_length, batch_size)
+        # mask should have size of (seq_length, batch_size)
+        mask = torch.tensor([[1, 1, 1], [1, 1, 0]], dtype=torch.uint8).transpose(0, 1)
+
+        llh = crf(emissions, tags, mask=mask, reduction='token_mean')
+
+        assert torch.is_tensor(llh)
+        assert llh.shape == ()
+
+        # shape: (batch_size, seq_length, num_tags)
+        emissions = emissions.transpose(0, 1)
+        # shape: (batch_size, seq_length)
+        tags = tags.transpose(0, 1)
+        # shape: (batch_size, seq_length)
+        mask = mask.transpose(0, 1)
+
+        # Compute log likelihood manually
+        manual_llh, n_tokens = 0, 0
+        for emission, tag, mask_ in zip(emissions, tags, mask):
+            seq_len = mask_.sum()
+            emission, tag = emission[:seq_len], tag[:seq_len]
+            numerator = compute_score(crf, emission, tag)
+            all_scores = [
+                compute_score(crf, emission, t)
+                for t in itertools.product(range(crf.num_tags), repeat=seq_len)
+            ]
+            denominator = math.log(sum(math.exp(s) for s in all_scores))
+            manual_llh += numerator - denominator
+            n_tokens += seq_len
+
+        assert llh.item() == approx(manual_llh / n_tokens)
+
     def test_batch_first(self):
         crf = make_crf()
         # shape: (seq_length, batch_size, num_tags)
