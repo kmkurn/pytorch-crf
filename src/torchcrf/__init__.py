@@ -186,7 +186,7 @@ class CRF(nn.Module):
         assert emissions.shape[:2] == tags.shape
         assert emissions.size(2) == self.num_tags
         assert mask.shape == tags.shape
-        assert all(mask[0])  # TODO use .all()
+        assert mask[0].all()
 
         seq_length = emissions.size(0)
         mask = mask.float()
@@ -238,7 +238,7 @@ class CRF(nn.Module):
         assert emissions.dim() == 3 and mask.dim() == 2
         assert emissions.shape[:2] == mask.shape
         assert emissions.size(2) == self.num_tags
-        assert all(mask[0])  # TODO use .all()
+        assert mask[0].all()
 
         seq_length = emissions.size(0)
         mask = mask.float()
