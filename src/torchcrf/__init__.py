@@ -151,8 +151,6 @@ class CRF(nn.Module):
                 f'got {emissions.size(2)}')
 
         if tags is not None:
-            if tags.dim() != 2:
-                raise ValueError(f'tags must have dimension of 2, got {tags.dim()}')
             if emissions.shape[:2] != tags.shape:
                 raise ValueError(
                     'the first two dimensions of emissions and tags must match, '

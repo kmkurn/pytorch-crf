@@ -221,15 +221,6 @@ class TestForward:
             crf(emissions, tags)
         assert 'emissions must have dimension of 3, got 2' in str(excinfo.value)
 
-    def test_tags_has_bad_number_of_dimension(self):
-        emissions = torch.randn(1, 2, 3)
-        tags = torch.empty(2, 2, 2, dtype=torch.long)
-        crf = make_crf(3)
-
-        with pytest.raises(ValueError) as excinfo:
-            crf(emissions, tags)
-        assert 'tags must have dimension of 2, got 3' in str(excinfo.value)
-
     def test_emissions_and_tags_size_mismatch(self):
         emissions = torch.randn(1, 2, 3)
         tags = torch.empty(2, 2, dtype=torch.long)
