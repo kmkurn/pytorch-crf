@@ -249,11 +249,6 @@ class CRF(nn.Module):
             # shape: (batch_size, num_tags, 1)
             broadcast_log_prob = log_prob.unsqueeze(2)
 
-            # Broadcast transition score over all instances in the batch
-            # shape: (1, num_tags, num_tags)
-            # TODO no need to broadcast explicitly bc this is the default
-            broadcast_transitions = self.transitions.unsqueeze(0)
-
             # Broadcast emission score over all possible current tags
             # shape: (batch_size, 1, num_tags)
             broadcast_emissions = emissions[i].unsqueeze(1)
@@ -263,13 +258,13 @@ class CRF(nn.Module):
             # possible tag sequences so far, that end with transitioning from tag i to tag j
             # and emitting
             # shape: (batch_size, num_tags, num_tags)
-            score = broadcast_log_prob + broadcast_transitions + broadcast_emissions
+            score = broadcast_log_prob + self.transitions + broadcast_emissions
 
             # Sum over all possible current tags, but we're in log prob space, so a sum
             # becomes a log-sum-exp: for each sample, entry i stores the sum of scores of
             # all possible tag sequences so far, that end in tag i
             # shape: (batch_size, num_tags)
-            score = torch.logsumexp(score, 1)
+            score = torch.logsumexp(score, dim=1)
 
             # Set log_prob to the score if this timestep is valid (mask == 1), otherwise
             # leave it alone
