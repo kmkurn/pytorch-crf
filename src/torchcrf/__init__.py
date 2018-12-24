@@ -249,14 +249,13 @@ class CRF(nn.Module):
             # shape: (batch_size, num_tags, num_tags)
             next_score = broadcast_score + self.transitions + broadcast_emissions
 
-            # Sum over all possible current tags, but we're in log prob space, so a sum
+            # Sum over all possible current tags, but we're in score space, so a sum
             # becomes a log-sum-exp: for each sample, entry i stores the sum of scores of
             # all possible tag sequences so far, that end in tag i
             # shape: (batch_size, num_tags)
             next_score = torch.logsumexp(next_score, dim=1)
 
-            # Set score to the next score if this timestep is valid (mask == 1), otherwise
-            # leave it alone
+            # Set score to the next score if this timestep is valid (mask == 1)
             # shape: (batch_size, num_tags)
             score = next_score * mask[i].unsqueeze(1) + score * (1. - mask[i]).unsqueeze(1)
 
