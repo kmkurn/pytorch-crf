@@ -156,7 +156,7 @@ class TestForward:
 
         assert llh.item() == approx(total_llh.item())
 
-    def test_not_summed_over_batch(self):
+    def test_reduction_none(self):
         crf = make_crf()
         # shape: (seq_length, batch_size, num_tags)
         emissions = make_emissions(crf)
@@ -188,6 +188,38 @@ class TestForward:
 
         for llh_, manual_llh_ in zip(llh, manual_llh):
             assert llh_.item() == approx(manual_llh_)
+
+    def test_reduction_mean(self):
+        crf = make_crf()
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(crf)
+        # shape: (seq_length, batch_size)
+        tags = make_tags(crf)
+
+        seq_length, batch_size = tags.shape
+
+        llh = crf(emissions, tags, reduction='mean')
+
+        assert torch.is_tensor(llh)
+        assert llh.shape == ()
+
+        # shape: (batch_size, seq_length, num_tags)
+        emissions = emissions.transpose(0, 1)
+        # shape: (batch_size, seq_length)
+        tags = tags.transpose(0, 1)
+
+        # Compute log likelihood manually
+        manual_llh = 0
+        for emission, tag in zip(emissions, tags):
+            numerator = compute_score(crf, emission, tag)
+            all_scores = [
+                compute_score(crf, emission, t)
+                for t in itertools.product(range(crf.num_tags), repeat=seq_length)
+            ]
+            denominator = math.log(sum(math.exp(s) for s in all_scores))
+            manual_llh += numerator - denominator
+
+        assert llh.item() == approx(manual_llh / batch_size)
 
     def test_batch_first(self):
         crf = make_crf()

@@ -94,7 +94,7 @@ class CRF(nn.Module):
             ``(batch_size,)`` otherwise.
         """
         self._validate(emissions, tags=tags, mask=mask)
-        if reduction not in ('none', 'sum'):
+        if reduction not in ('none', 'sum', 'mean'):
             raise ValueError(f'invalid reduction: {reduction}')
         if mask is None:
             mask = torch.ones_like(tags, dtype=torch.uint8)
@@ -111,7 +111,12 @@ class CRF(nn.Module):
         # shape: (batch_size,)
         llh = numerator - denominator
 
-        return llh if reduction == 'none' else torch.sum(llh)
+        if reduction == 'none':
+            return llh
+        if reduction == 'sum':
+            return llh.sum()
+        assert reduction == 'mean'
+        return llh.mean()
 
     def decode(self, emissions: torch.Tensor,
                mask: Optional[torch.ByteTensor] = None) -> List[List[int]]:
