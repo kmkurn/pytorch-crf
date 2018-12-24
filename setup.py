@@ -7,7 +7,7 @@ with open(os.path.join(here, 'README.rst')) as f:
 
 setup(
     name='pytorch-crf',
-    version='0.6.0',
+    version='0.7.0',
     description='Conditional random field in PyTorch',
     long_description=readme,
     url='https://github.com/kmkurn/pytorch-crf',
