@@ -109,10 +109,13 @@ class CRF(nn.Module):
                 raise ValueError(
                     f'size of tags and mask must match, got {tuple(tags.shape)} '
                     f'and {tuple(mask.shape)}')
-            if not all(mask[0]):  # TODO(BUG) fix this when batch_first=True
+
+            no_empty_seq = not self.batch_first and mask[0].all()
+            no_empty_seq_bf = self.batch_first and mask[:, 0].all()
+            if not no_empty_seq and not no_empty_seq_bf:
                 raise ValueError('mask of the first timestep must all be on')
 
-        if mask is None:
+        else:
             mask = torch.ones_like(tags, dtype=torch.uint8)
 
         if self.batch_first:
