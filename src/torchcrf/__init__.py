@@ -195,6 +195,7 @@ class CRF(nn.Module):
         # shape: (batch_size,)
         score = self.start_transitions[tags[0]]
 
+        # TODO try to loop from 1 to (seq_length - 1)
         for i in range(seq_length - 1):
             # shape: (batch_size,)
             cur_tag, next_tag = tags[i], tags[i + 1]
@@ -236,15 +237,14 @@ class CRF(nn.Module):
 
         # Start transition score and first emission
         # shape: (batch_size, num_tags)
-        # log_prob has size of (batch_size, num_tags) where for each batch,
-        # the j-th column stores the log probability that the first timestep has tag j
-        # TODO rename log_prob
-        log_prob = self.start_transitions.view(1, -1) + emissions[0]
+        # score has size of (batch_size, num_tags) where for each batch,
+        # the j-th column stores the score that the first timestep has tag j
+        score = self.start_transitions.view(1, -1) + emissions[0]
 
         for i in range(1, seq_length):
-            # Broadcast log_prob over all possible next tags
+            # Broadcast score over all possible next tags
             # shape: (batch_size, num_tags, 1)
-            broadcast_log_prob = log_prob.unsqueeze(2)
+            broadcast_score = score.unsqueeze(2)
 
             # Broadcast emission score over all possible current tags
             # shape: (batch_size, 1, num_tags)
@@ -255,26 +255,26 @@ class CRF(nn.Module):
             # possible tag sequences so far, that end with transitioning from tag i to tag j
             # and emitting
             # shape: (batch_size, num_tags, num_tags)
-            score = broadcast_log_prob + self.transitions + broadcast_emissions
+            next_score = broadcast_score + self.transitions + broadcast_emissions
 
             # Sum over all possible current tags, but we're in log prob space, so a sum
             # becomes a log-sum-exp: for each sample, entry i stores the sum of scores of
             # all possible tag sequences so far, that end in tag i
             # shape: (batch_size, num_tags)
-            score = torch.logsumexp(score, dim=1)
+            next_score = torch.logsumexp(next_score, dim=1)
 
-            # Set log_prob to the score if this timestep is valid (mask == 1), otherwise
+            # Set score to the next score if this timestep is valid (mask == 1), otherwise
             # leave it alone
             # shape: (batch_size, num_tags)
-            log_prob = score * mask[i].unsqueeze(1) + log_prob * (1. - mask[i]).unsqueeze(1)
+            score = next_score * mask[i].unsqueeze(1) + score * (1. - mask[i]).unsqueeze(1)
 
         # End transition score
         # shape: (batch_size, num_tags)
-        log_prob += self.end_transitions.view(1, -1)
+        score += self.end_transitions.view(1, -1)
 
         # Sum (log-sum-exp) over all possible tags
         # shape: (batch_size,)
-        return torch.logsumexp(log_prob, 1)
+        return torch.logsumexp(score, dim=1)
 
     def _viterbi_decode(self, emissions: torch.FloatTensor,
                         mask: torch.ByteTensor) -> List[List[int]]:
