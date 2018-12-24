@@ -289,9 +289,15 @@ class CRF(nn.Module):
         # shape: (batch_size,)
         return torch.logsumexp(log_prob, 1)
 
-    def _viterbi_decode(self, emissions: torch.FloatTensor, mask: torch.ByteTensor) \
-            -> List[List[int]]:
-        # TODO assert for emissions and mask
+    def _viterbi_decode(self, emissions: torch.FloatTensor,
+                        mask: torch.ByteTensor) -> List[List[int]]:
+        # emissions: (seq_length, batch_size, num_tags)
+        # mask: (seq_length, batch_size)
+        assert emissions.dim() == 3 and mask.dim() == 2
+        assert emissions.shape[:2] == mask.shape
+        assert emissions.size(2) == self.num_tags
+        assert mask[0].all()
+
         seq_length = emissions.size(0)
         batch_size = emissions.size(1)
 
