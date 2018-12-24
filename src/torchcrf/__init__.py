@@ -84,14 +84,16 @@ class CRF(nn.Module):
             Mask tensor of size ``(seq_length, batch_size)`` if ``batch_first`` is ``False``,
             ``(batch_size, seq_length)`` otherwise.
         reduction : str, optional
-            Specifies  the reduction to apply to the output: 'none'|'sum'. 'none': no reduction
-            will be applied. 'sum': the output will be summed over batch.
+            Specifies  the reduction to apply to the output: 'none'|'sum'|'mean'|'token_mean'.
+            'none': no reduction will be applied. 'sum': the output will be summed over batches.
+            'mean': the output will be averaged over batches. 'token_mean': the output will be
+            averaged over tokens.
 
         Returns
         -------
         :class:`~torch.Tensor`
-            The log likelihood. This will have size ``()`` if reduction is 'sum',
-            ``(batch_size,)`` otherwise.
+            The log likelihood. This will have size ``(batch_size,)`` if reduction is 'none',
+            ``()`` otherwise.
         """
         self._validate(emissions, tags=tags, mask=mask)
         if reduction not in ('none', 'sum', 'mean', 'token_mean'):
