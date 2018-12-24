@@ -203,13 +203,9 @@ class CRF(nn.Module):
             # shape: (batch_size,)
             score += emissions[i, torch.arange(batch_size), cur_tag] * mask[i]
 
-            # Transition score to next tag
+            # Transition score to next tag, only added if next timestep is valid (mask == 1)
             # shape: (batch_size,)
-            transition_score = self.transitions[cur_tag, next_tag]
-
-            # Only add transition score if the next tag is not masked (mask == 1)
-            # shape: (batch_size,)
-            score += transition_score * mask[i + 1]
+            score += self.transitions[cur_tag, next_tag] * mask[i + 1]
 
         # Emission score for the tag in position (seq_length - 1), if mask is valid (mask == 1)
         # this is needed because the loop doesn't reach (seq_length - 1)
