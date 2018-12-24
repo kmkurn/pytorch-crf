@@ -389,3 +389,20 @@ class TestDecode:
         assert (
             'the first two dimensions of emissions and mask must match, '
             'got (1, 2) and (2, 2)') in str(excinfo.value)
+
+    def test_first_timestep_mask_is_not_all_on(self):
+        emissions = torch.randn(3, 2, 4)
+        mask = torch.tensor([[1, 1, 1], [0, 0, 0]], dtype=torch.uint8).transpose(0, 1)
+        crf = make_crf(4)
+
+        with pytest.raises(ValueError) as excinfo:
+            crf.decode(emissions, mask=mask)
+        assert 'mask of the first timestep must all be on' in str(excinfo.value)
+
+        emissions = emissions.transpose(0, 1)
+        mask = mask.transpose(0, 1)
+        crf = make_crf(4, batch_first=True)
+
+        with pytest.raises(ValueError) as excinfo:
+            crf.decode(emissions, mask=mask)
+        assert 'mask of the first timestep must all be on' in str(excinfo.value)

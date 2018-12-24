@@ -156,13 +156,18 @@ class CRF(nn.Module):
             raise ValueError(
                 f'expected last dimension of emissions is {self.num_tags}, '
                 f'got {emissions.size(2)}')
-        if mask is not None and emissions.shape[:2] != mask.shape:
-            raise ValueError(
-                'the first two dimensions of emissions and mask must match, '
-                f'got {tuple(emissions.shape[:2])} and {tuple(mask.shape)}')
-            # TODO assert for mask's first timestep
+        if mask is not None:
+            if emissions.shape[:2] != mask.shape:
+                raise ValueError(
+                    'the first two dimensions of emissions and mask must match, '
+                    f'got {tuple(emissions.shape[:2])} and {tuple(mask.shape)}')
 
-        if mask is None:
+            no_empty_seq = not self.batch_first and mask[0].all()
+            no_empty_seq_bf = self.batch_first and mask[:, 0].all()
+            if not no_empty_seq and not no_empty_seq_bf:
+                raise ValueError('mask of the first timestep must all be on')
+
+        else:
             mask = emissions.new_ones(emissions.shape[:2], dtype=torch.uint8)
 
         if self.batch_first:
