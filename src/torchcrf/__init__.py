@@ -231,17 +231,21 @@ class CRF(nn.Module):
         # (batch_size, num_tags) where for each batch, the j-th column stores
         # the score that the first timestep has tag j
         # shape: (batch_size, num_tags)
+        # TODO no need for .view(1, -1)
         score = self.start_transitions.view(1, -1) + emissions[0]
 
         for i in range(1, seq_length):
+            # TODO make comments clearer, see _viterbi_decode
             # Broadcast score over all possible next tags
             # shape: (batch_size, num_tags, 1)
             broadcast_score = score.unsqueeze(2)
 
+            # TODO make comments clearer, see _viterbi_decode
             # Broadcast emission score over all possible current tags
             # shape: (batch_size, 1, num_tags)
             broadcast_emissions = emissions[i].unsqueeze(1)
 
+            # TODO make comments clearer, see _viterbi_decode
             # Sum current log probability, transition, and emission scores: for each sample
             # in the batch, entry in row i and column j stores the sum of scores of all
             # possible tag sequences so far, that end with transitioning from tag i to tag j
@@ -261,6 +265,7 @@ class CRF(nn.Module):
 
         # End transition score
         # shape: (batch_size, num_tags)
+        # TODO no need for .view(1, -1)
         score += self.end_transitions.view(1, -1)
 
         # Sum (log-sum-exp) over all possible tags
@@ -276,22 +281,18 @@ class CRF(nn.Module):
         assert emissions.size(2) == self.num_tags
         assert mask[0].all()
 
-        seq_length = emissions.size(0)
-        batch_size = emissions.size(1)
+        seq_length, batch_size = mask.shape
+        mask = mask.float()
 
-        # emissions: (seq_length, batch_size, num_tags)
-        assert emissions.size(2) == self.num_tags
+        # Start transition and first emission
+        # shape: (batch_size, num_tags)
+        score = self.start_transitions + emissions[0]
+        history = []
 
-        # TODO might want to refactor this to closely mimic _compute_normalizer
-
-        # Start transition
-        viterbi_score = []
-        viterbi_score.append(self.start_transitions + emissions[0])
-        viterbi_path = []
-
-        # viterbi_score is a list of tensors of shapes of (num_tags,) where value at
-        # index i stores the score of the best tag sequence so far that ends with tag i
-        # viterbi_path saves where the best tags candidate transitioned from; this is used
+        # score is a tensor of size (batch_size, num_tags) where for every batch,
+        # value at column j stores the score of the best tag sequence so far that ends
+        # with tag j
+        # history saves where the best tags candidate transitioned from; this is used
         # when we trace back the best tag sequence
 
         # Viterbi algorithm recursive case: we compute the score of the best tag sequence
@@ -299,44 +300,48 @@ class CRF(nn.Module):
         for i in range(1, seq_length):
             # Broadcast viterbi score for every possible next tag
             # shape: (batch_size, num_tags, 1)
-            broadcast_score = viterbi_score[i - 1].view(batch_size, -1, 1)
+            broadcast_score = score.unsqueeze(2)
 
             # Broadcast emission score for every possible current tag
             # shape: (batch_size, 1, num_tags)
-            broadcast_emission = emissions[i].view(batch_size, 1, -1)
+            broadcast_emission = emissions[i].unsqueeze(1)
 
             # Compute the score matrix of shape (batch_size, num_tags, num_tags) where
-            # for each sample, each entry at row i and column j stores the score of
-            # transitioning from tag i to tag j and emitting
+            # for each sample, each entry at row i and column j stores the score of the best
+            # tag sequence so far that ends with transitioning from tag i to tag j and emitting
             # shape: (batch_size, num_tags, num_tags)
-            score = broadcast_score + self.transitions + broadcast_emission
+            next_score = broadcast_score + self.transitions + broadcast_emission
 
             # Find the maximum score over all possible current tag
             # shape: (batch_size, num_tags)
-            best_score, best_path = score.max(1)
+            next_score, indices = next_score.max(dim=1)
 
-            # Save the score and the path
-            viterbi_score.append(best_score)
-            viterbi_path.append(best_path)
+            # Set score to the next score if this timestep is valid (mask == 1)
+            # and save the index that produces the next score
+            # shape: (batch_size, num_tags)
+            score = next_score * mask[i].unsqueeze(1) + score * (1 - mask[i]).unsqueeze(1)
+            history.append(indices)
+
+        # End transition score
+        # shape: (batch_size, num_tags)
+        score += self.end_transitions
 
         # Now, compute the best path for each sample
+
         # shape: (batch_size,)
-        sequence_lengths = mask.long().sum(dim=0)
-        # List to store the decoded paths
+        seq_ends = mask.long().sum(dim=0) - 1
         best_tags_list = []
 
         for idx in range(batch_size):
             # Find the tag which maximizes the score at the last timestep; this is our best tag
             # for the last timestep
-            seq_end = sequence_lengths[idx] - 1
-            _, best_last_tag = (viterbi_score[seq_end][idx] + self.end_transitions).max(0)
+            _, best_last_tag = score[idx].max(dim=0)
             best_tags = [best_last_tag.item()]
 
             # We trace back where the best last tag comes from, append that to our best tag
             # sequence, and trace it back again, and so on
-            # TODO might wanna use seq_end here
-            for path in reversed(viterbi_path[:sequence_lengths[idx] - 1]):
-                best_last_tag = path[idx][best_tags[-1]]
+            for hist in reversed(history[:seq_ends[idx]]):
+                best_last_tag = hist[idx][best_tags[-1]]
                 best_tags.append(best_last_tag.item())
 
             # Reverse the order because we start from the last timestep
