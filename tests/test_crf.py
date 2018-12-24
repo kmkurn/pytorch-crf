@@ -250,16 +250,6 @@ class TestForward:
             crf(emissions, tags)
         assert 'expected last dimension of emissions is 10, got 3' in str(excinfo.value)
 
-    def test_mask_and_tags_size_mismatch(self):
-        emissions = torch.randn(1, 2, 3)
-        tags = torch.empty(1, 2, dtype=torch.long)
-        mask = torch.tensor([[1], [1]], dtype=torch.uint8)
-        crf = make_crf(3)
-
-        with pytest.raises(ValueError) as excinfo:
-            crf(emissions, tags, mask=mask)
-        assert 'size of tags and mask must match, got (1, 2) and (2, 1)' in str(excinfo.value)
-
     def test_first_timestep_mask_is_not_all_on(self):
         emissions = torch.randn(3, 2, 4)
         tags = torch.empty(3, 2, dtype=torch.long)
