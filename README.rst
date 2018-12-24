@@ -28,7 +28,7 @@ Requirements
 ============
 
 - Python 3.6
-- PyTorch 0.4.1
+- PyTorch 1.0.0
 
 Installation
 ============
