@@ -257,7 +257,7 @@ class CRF(nn.Module):
 
             # Set score to the next score if this timestep is valid (mask == 1)
             # shape: (batch_size, num_tags)
-            score = next_score * mask[i].unsqueeze(1) + score * (1. - mask[i]).unsqueeze(1)
+            score = next_score * mask[i].unsqueeze(1) + score * (1 - mask[i]).unsqueeze(1)
 
         # End transition score
         # shape: (batch_size, num_tags)
