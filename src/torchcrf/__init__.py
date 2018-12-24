@@ -188,7 +188,7 @@ class CRF(nn.Module):
         assert mask.shape == tags.shape
         assert mask[0].all()
 
-        seq_length = emissions.size(0)
+        seq_length, batch_size = tags.shape
         mask = mask.float()
 
         # Start transition score
@@ -201,8 +201,7 @@ class CRF(nn.Module):
 
             # Emission score for current tag
             # shape: (batch_size,)
-            # TODO use advanced indexing
-            llh += emissions[i].gather(1, cur_tag.view(-1, 1)).squeeze(1) * mask[i]
+            llh += emissions[i, torch.arange(batch_size), cur_tag] * mask[i]
 
             # Transition score to next tag
             # shape: (batch_size,)
@@ -212,22 +211,19 @@ class CRF(nn.Module):
             # shape: (batch_size,)
             llh += transition_score * mask[i + 1]
 
-        # Find last tag index
-        # shape: (batch_size,)
-        last_tag_indices = mask.long().sum(0) - 1
-        # shape: (batch_size,)
-        # TODO use advanced indexing
-        last_tags = tags.gather(0, last_tag_indices.view(1, -1)).squeeze(0)
-
         # End transition score
+        # shape: (batch_size,)
+        seq_ends = mask.long().sum(dim=0) - 1
+        # shape: (batch_size,)
+        last_tags = tags[seq_ends, torch.arange(batch_size)]
         # shape: (batch_size,)
         llh += self.end_transitions[last_tags]
 
         # Emission score for the tag in position (seq_length - 1), if mask is valid (mask == 1)
+        # this is needed because the loop doesn't reach (seq_length - 1)
         # shape: (batch_size,)
-        # TODO use advanced indexing
         # TODO check if last_tags can be replaced by tags[-1]
-        llh += emissions[-1].gather(1, last_tags.view(-1, 1)).squeeze(1) * mask[-1]
+        llh += emissions[-1, torch.arange(batch_size), last_tags] * mask[-1]
 
         return llh
 
