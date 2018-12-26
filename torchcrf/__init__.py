@@ -227,7 +227,6 @@ class CRF(nn.Module):
         assert mask[0].all()
 
         seq_length = emissions.size(0)
-        mask = mask.float()
 
         # Start transition score and first emission; score has size of
         # (batch_size, num_tags) where for each batch, the j-th column stores
@@ -259,7 +258,7 @@ class CRF(nn.Module):
 
             # Set score to the next score if this timestep is valid (mask == 1)
             # shape: (batch_size, num_tags)
-            score = next_score * mask[i].unsqueeze(1) + score * (1 - mask[i]).unsqueeze(1)
+            score = torch.where(mask[i].unsqueeze(1), next_score, score)
 
         # End transition score
         # shape: (batch_size, num_tags)
@@ -279,7 +278,6 @@ class CRF(nn.Module):
         assert mask[0].all()
 
         seq_length, batch_size = mask.shape
-        mask = mask.float()
 
         # Start transition and first emission
         # shape: (batch_size, num_tags)
@@ -316,7 +314,7 @@ class CRF(nn.Module):
             # Set score to the next score if this timestep is valid (mask == 1)
             # and save the index that produces the next score
             # shape: (batch_size, num_tags)
-            score = next_score * mask[i].unsqueeze(1) + score * (1 - mask[i]).unsqueeze(1)
+            score = torch.where(mask[i].unsqueeze(1), next_score, score)
             history.append(indices)
 
         # End transition score
