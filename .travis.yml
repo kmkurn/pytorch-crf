@@ -6,7 +6,7 @@ before_install:
   - conda update -y conda
   - conda create -y -n pytorch-crf python=3.6
   - source activate pytorch-crf
-  - conda install -y -c pytorch pytorch=0.4.1
+  - conda install -y -c pytorch pytorch=1.0.0
   - export LD_LIBRARY_PATH="$HOME/miniconda/envs/pytorch-crf/lib:$LD_LIBRARY_PATH"
 install:
   - pip install --ignore-installed -r requirements.txt
