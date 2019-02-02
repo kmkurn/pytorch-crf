@@ -72,6 +72,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
 
+# The default role.
 default_role = 'py:obj'
 
 # -- Options for HTML output -------------------------------------------------

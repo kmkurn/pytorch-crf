@@ -7,10 +7,10 @@ import torch.nn as nn
 class CRF(nn.Module):
     """Conditional random field.
 
-    This module implements a conditional random field [LMP]. The forward computation
+    This module implements a conditional random field [LMP01]_. The forward computation
     of this class computes the log likelihood of the given sequence of tags and
-    emission score tensor. This class also has ``decode`` method which finds the
-    best tag sequence given an emission score tensor using `Viterbi algorithm`_.
+    emission score tensor. This class also has `decode <CRF.decode>` method which finds
+    the best tag sequence given an emission score tensor using `Viterbi algorithm`_.
 
     Arguments
     ---------
@@ -30,10 +30,10 @@ class CRF(nn.Module):
 
     References
     ----------
-    .. [LMP] Lafferty, J., McCallum, A., Pereira, F. (2001).
-             "Conditional random fields: Probabilistic models for segmenting and
-             labeling sequence data". *Proc. 18th International Conf. on Machine
-             Learning*. Morgan Kaufmann. pp. 282–289.
+    .. [LMP01] Lafferty, J., McCallum, A., Pereira, F. (2001).
+       "Conditional random fields: Probabilistic models for segmenting and
+       labeling sequence data". *Proc. 18th International Conf. on Machine
+       Learning*. Morgan Kaufmann. pp. 282–289.
 
     .. _Viterbi algorithm: https://en.wikipedia.org/wiki/Viterbi_algorithm
     """
