@@ -10,7 +10,7 @@ before_install:
   - export LD_LIBRARY_PATH="$HOME/miniconda/envs/pytorch-crf/lib:$LD_LIBRARY_PATH"
 install:
   - pip install --ignore-installed -r requirements.txt
-  - pip install .
+  - pip install -e .
 script: pytest
 after_success:
   - pip install coveralls
