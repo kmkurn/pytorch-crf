@@ -1,3 +1,4 @@
+# Intended for RTD build only
 name: pytorch-crf
 channels:
   - pytorch
@@ -5,3 +6,5 @@ channels:
 dependencies:
   - python=3.6
   - pytorch=1.0.0
+  - pip:
+      - "-r requirements.txt"
