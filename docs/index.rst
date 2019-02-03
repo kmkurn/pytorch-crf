@@ -14,7 +14,6 @@ modifications.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
 Minimal requirements
 ====================
@@ -32,7 +31,9 @@ Install with pip::
 Getting started
 ===============
 
-**pytorch-crf** exposes a single `~torchcrf.CRF` class which inherits from PyTorch's
+.. currentmodule:: torchcrf
+
+**pytorch-crf** exposes a single `CRF` class which inherits from PyTorch's
 `nn.Module <torch.nn.Module>`. This class provides an implementation of a CRF layer.
 
 .. code-block:: python
@@ -73,19 +74,19 @@ If you have some padding in your input tensors, you can pass a mask tensor.
 
 Note that the returned value is the *log likelihood* so you'll need to make this value
 negative as your loss. By default, the log likelihood is summed over batches. For other
-options, consult the API documentation of `CRF.forward <torchcrf.CRF.forward>`.
+options, consult the API documentation of `CRF.forward`.
 
 Decoding
 --------
 
-To obtain the most probable sequence of tags, use the `~torch.CRF.decode` method.
+To obtain the most probable sequence of tags, use the `CRF.decode` method.
 
 .. code-block:: python
 
    >>> model.decode(emissions)
    [[3, 1, 3], [0, 1, 0]]
 
-This method also accepts a mask tensor, see `CRF.forward <torchcrf.CRF.forward>` for details.
+This method also accepts a mask tensor, see `CRF.forward` for details.
 
 API documentation
 =================
