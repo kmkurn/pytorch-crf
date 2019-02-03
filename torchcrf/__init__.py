@@ -9,27 +9,22 @@ class CRF(nn.Module):
 
     This module implements a conditional random field [LMP01]_. The forward computation
     of this class computes the log likelihood of the given sequence of tags and
-    emission score tensor. This class also has `decode <CRF.decode>` method which finds
+    emission score tensor. This class also has `~CRF.decode` method which finds
     the best tag sequence given an emission score tensor using `Viterbi algorithm`_.
 
-    Arguments
-    ---------
-    num_tags : int
-        Number of tags.
-    batch_first : bool, optional
-        Whether the first dimension corresponds to the size of a minibatch.
+    Args:
+        num_tags: Number of tags.
+        batch_first: Whether the first dimension corresponds to the size of a minibatch.
 
-    Attributes
-    ----------
-    start_transitions : :class:`~torch.nn.Parameter`
-        Start transition score tensor of size ``(num_tags,)``.
-    end_transitions : :class:`~torch.nn.Parameter`
-        End transition score tensor of size ``(num_tags,)``.
-    transitions : :class:`~torch.nn.Parameter`
-        Transition score tensor of size ``(num_tags, num_tags)``.
+    Attributes:
+        start_transitions (`~torch.nn.Parameter`): Start transition score tensor of size
+            ``(num_tags,)``.
+        end_transitions (`~torch.nn.Parameter`): End transition score tensor of size
+            ``(num_tags,)``.
+        transitions (`~torch.nn.Parameter`): Transition score tensor of size
+            ``(num_tags, num_tags)``.
 
-    References
-    ----------
+
     .. [LMP01] Lafferty, J., McCallum, A., Pereira, F. (2001).
        "Conditional random fields: Probabilistic models for segmenting and
        labeling sequence data". *Proc. 18th International Conf. on Machine
@@ -72,27 +67,21 @@ class CRF(nn.Module):
     ) -> torch.Tensor:
         """Compute the conditional log likelihood of a sequence of tags given emission scores.
 
-        Arguments
-        ---------
-        emissions : :class:`~torch.Tensor`
-            Emission score tensor of size ``(seq_length, batch_size, num_tags)`` if
-            ``batch_first`` is ``False``, ``(batch_size, seq_length, num_tags)`` otherwise.
-        tags : :class:`~torch.LongTensor`
-            Sequence of tags tensor of size ``(seq_length, batch_size)`` if
-            ``batch_first`` is ``False``, ``(batch_size, seq_length)`` otherwise.
-        mask : :class:`~torch.ByteTensor`, optional
-            Mask tensor of size ``(seq_length, batch_size)`` if ``batch_first`` is ``False``,
-            ``(batch_size, seq_length)`` otherwise.
-        reduction : str, optional
-            Specifies  the reduction to apply to the output: 'none'|'sum'|'mean'|'token_mean'.
-            'none': no reduction will be applied. 'sum': the output will be summed over batches.
-            'mean': the output will be averaged over batches. 'token_mean': the output will be
-            averaged over tokens.
+        Args:
+            emissions: Emission score tensor of size ``(seq_length, batch_size, num_tags)``
+                if ``batch_first`` is ``False``, ``(batch_size, seq_length, num_tags)``
+                otherwise.
+            tags: Sequence of tags tensor of size ``(seq_length, batch_size)`` if
+                ``batch_first`` is ``False``, ``(batch_size, seq_length)`` otherwise.
+            mask: Mask tensor of size ``(seq_length, batch_size)`` if ``batch_first`` is
+                ``False``, ``(batch_size, seq_length)`` otherwise.
+            reduction: Specifies  the reduction to apply to the output:
+                ``none|sum|mean|token_mean``. ``none``: no reduction will be applied.
+                ``sum``: the output will be summed over batches. ``mean``: the output will be
+                averaged over batches. ``token_mean``: the output will be averaged over tokens.
 
-        Returns
-        -------
-        :class:`~torch.Tensor`
-            The log likelihood. This will have size ``(batch_size,)`` if reduction is 'none',
+        Returns:
+            The log likelihood. This will have size ``(batch_size,)`` if reduction is ``none``,
             ``()`` otherwise.
         """
         self._validate(emissions, tags=tags, mask=mask)
@@ -126,18 +115,14 @@ class CRF(nn.Module):
                mask: Optional[torch.ByteTensor] = None) -> List[List[int]]:
         """Find the most likely tag sequence using Viterbi algorithm.
 
-        Arguments
-        ---------
-        emissions : :class:`~torch.Tensor`
-            Emission score tensor of size ``(seq_length, batch_size, num_tags)`` if
-            ``batch_first`` is ``False``, ``(batch_size, seq_length, num_tags)`` otherwise.
-        mask : :class:`~torch.ByteTensor`, optional
-            Mask tensor of size ``(seq_length, batch_size)`` if ``batch_first`` is ``False``,
-            ``(batch_size, seq_length)`` otherwise.
+        Args:
+            emissions: Emission score tensor of size ``(seq_length, batch_size, num_tags)``
+                if ``batch_first`` is ``False``, ``(batch_size, seq_length, num_tags)``
+                otherwise.
+            mask: Mask tensor of size ``(seq_length, batch_size)`` if ``batch_first`` is
+                ``False``, ``(batch_size, seq_length)`` otherwise.
 
-        Returns
-        -------
-        List[List[int]]
+        Returns:
             List of list containing the best tag sequence for each batch.
         """
         self._validate(emissions, mask=mask)

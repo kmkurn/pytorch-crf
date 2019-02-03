@@ -86,7 +86,7 @@ To obtain the most probable sequence of tags, use the `CRF.decode` method.
    >>> model.decode(emissions)
    [[3, 1, 3], [0, 1, 0]]
 
-This method also accepts a mask tensor, see `CRF.forward` for details.
+This method also accepts a mask tensor, see `CRF.decode` for details.
 
 API documentation
 =================
@@ -99,7 +99,6 @@ Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
 
 
