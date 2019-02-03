@@ -12,4 +12,6 @@ install:
   - pip install --ignore-installed -r requirements.txt
   - pip install .
 script: pytest
-after_success: coveralls
+after_success:
+  - pip install coveralls
+  - coveralls
