@@ -11,5 +11,5 @@ before_install:
 install:
   - pip install --ignore-installed -r requirements.txt
   - pip install .
-script: pytest --cov
+script: pytest
 after_success: coveralls
