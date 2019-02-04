@@ -21,23 +21,6 @@ This implementation borrows mostly from `AllenNLP CRF module
 <https://github.com/allenai/allennlp/blob/master/allennlp/modules/conditional_ra
 ndom_field.py>`_ with some modifications.
 
-Requirements
-============
-
-- Python 3.6
-- PyTorch 1.0.0
-
-Installation
-============
-
-Install with pip::
-
-    $ pip install pytorch-crf
-
-Or, install from Github for the latest version::
-
-    $ pip install git+https://github.com/kmkurn/pytorch-crf#egg=pytorch_crf
-
 Documentation
 =============
 
@@ -63,15 +46,15 @@ install this package in development mode.
 
 ::
 
-    $ pip install -r requirements.txt
-    $ pip install -e .
+    pip install -r requirements.txt
+    pip install -e .
 
 Setup pre-commit hook
 ---------------------
 
 Simply run::
 
-    $ ln -s ../../pre-commit.sh .git/hooks/pre-commit
+    ln -s ../../pre-commit.sh .git/hooks/pre-commit
 
 Running tests
 -------------
