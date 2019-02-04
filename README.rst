@@ -41,7 +41,7 @@ Or, install from Github for the latest version::
 Documentation
 =============
 
-https://pytorch-crf.readthedocs.io/en/latest/
+https://pytorch-crf.readthedocs.io/
 
 License
 =======
