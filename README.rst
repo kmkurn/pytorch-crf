@@ -52,8 +52,7 @@ Contributing
 ============
 
 Contributions are welcome! Please follow these instructions to install
-dependencies and running the tests and linter. Make a pull request to
-``develop`` branch once your contribution is ready.
+dependencies and running the tests and linter.
 
 Installing dependencies
 -----------------------
