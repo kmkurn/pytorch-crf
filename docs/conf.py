@@ -16,7 +16,14 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
 
-from torchcrf import __version__
+from pathlib import Path
+import re
+
+here = Path(__file__).resolve().parent
+__version__ = re.search(
+    r'__version__ = (["\'])([^"\']*)\1',
+    (here.parent / 'torchcrf' / '__init__.py').read_text(),
+)[2]
 
 # -- Project information -----------------------------------------------------
 
