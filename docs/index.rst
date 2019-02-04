@@ -93,7 +93,6 @@ API documentation
 
 .. autoclass:: torchcrf.CRF
    :members:
-   :show-inheritance:
 
 Indices and tables
 ==================

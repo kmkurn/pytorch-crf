@@ -68,21 +68,22 @@ class CRF(nn.Module):
         """Compute the conditional log likelihood of a sequence of tags given emission scores.
 
         Args:
-            emissions: Emission score tensor of size ``(seq_length, batch_size, num_tags)``
-                if ``batch_first`` is ``False``, ``(batch_size, seq_length, num_tags)``
-                otherwise.
-            tags: Sequence of tags tensor of size ``(seq_length, batch_size)`` if
-                ``batch_first`` is ``False``, ``(batch_size, seq_length)`` otherwise.
-            mask: Mask tensor of size ``(seq_length, batch_size)`` if ``batch_first`` is
-                ``False``, ``(batch_size, seq_length)`` otherwise.
+            emissions (`~torch.Tensor`): Emission score tensor of size
+                ``(seq_length, batch_size, num_tags)`` if ``batch_first`` is ``False``,
+                ``(batch_size, seq_length, num_tags)`` otherwise.
+            tags (`~torch.LongTensor`): Sequence of tags tensor of size
+                ``(seq_length, batch_size)`` if ``batch_first`` is ``False``,
+                ``(batch_size, seq_length)`` otherwise.
+            mask (`~torch.ByteTensor`): Mask tensor of size ``(seq_length, batch_size)``
+                if ``batch_first`` is ``False``, ``(batch_size, seq_length)`` otherwise.
             reduction: Specifies  the reduction to apply to the output:
                 ``none|sum|mean|token_mean``. ``none``: no reduction will be applied.
                 ``sum``: the output will be summed over batches. ``mean``: the output will be
                 averaged over batches. ``token_mean``: the output will be averaged over tokens.
 
         Returns:
-            The log likelihood. This will have size ``(batch_size,)`` if reduction is ``none``,
-            ``()`` otherwise.
+            `~torch.Tensor`: The log likelihood. This will have size ``(batch_size,)`` if
+            reduction is ``none``, ``()`` otherwise.
         """
         self._validate(emissions, tags=tags, mask=mask)
         if reduction not in ('none', 'sum', 'mean', 'token_mean'):
@@ -116,11 +117,11 @@ class CRF(nn.Module):
         """Find the most likely tag sequence using Viterbi algorithm.
 
         Args:
-            emissions: Emission score tensor of size ``(seq_length, batch_size, num_tags)``
-                if ``batch_first`` is ``False``, ``(batch_size, seq_length, num_tags)``
-                otherwise.
-            mask: Mask tensor of size ``(seq_length, batch_size)`` if ``batch_first`` is
-                ``False``, ``(batch_size, seq_length)`` otherwise.
+            emissions (`~torch.Tensor`): Emission score tensor of size
+                ``(seq_length, batch_size, num_tags)`` if ``batch_first`` is ``False``,
+                ``(batch_size, seq_length, num_tags)`` otherwise.
+            mask (`~torch.ByteTensor`): Mask tensor of size ``(seq_length, batch_size)``
+                if ``batch_first`` is ``False``, ``(batch_size, seq_length)`` otherwise.
 
         Returns:
             List of list containing the best tag sequence for each batch.
