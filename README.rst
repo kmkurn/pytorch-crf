@@ -9,6 +9,9 @@ Conditional random field in `PyTorch <http://pytorch.org/>`_.
 .. image:: https://travis-ci.org/kmkurn/pytorch-crf.svg?branch=master
    :target: https://travis-ci.org/kmkurn/pytorch-crf
 
+.. image:: https://readthedocs.org/projects/pytorch-crf/badge/?version=stable
+   :target: https://pytorch-crf.readthedocs.io/en/stable/?badge=stable
+
 .. image:: https://coveralls.io/repos/github/kmkurn/pytorch-crf/badge.svg?branch=master
    :target: https://coveralls.io/github/kmkurn/pytorch-crf?branch=master
 
