@@ -1,5 +1,4 @@
+-r requirements-test.txt
 flake8==3.5.0
 flake8-mypy==17.8.0
-pytest==3.2.5
-pytest-cov==2.5.1
 yapf==0.25.0
