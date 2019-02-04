@@ -1,3 +1,5 @@
+__version__ = '0.7.0'
+
 from typing import List, Optional
 
 import torch

@@ -16,17 +16,18 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
 
+from torchcrf import __version__
+
 # -- Project information -----------------------------------------------------
 
 project = 'pytorch-crf'
 copyright = '2019, Kemal Kurniawan'
 author = 'Kemal Kurniawan'
 
-# TODO single source version
 # The short X.Y version
-version = '0.7'
+version = '.'.join(__version__.split('.')[:-1])
 # The full version, including alpha/beta/rc tags
-release = '0.7.0'
+release = __version__
 
 # -- General configuration ---------------------------------------------------
 
