@@ -1,7 +1,7 @@
 language: python
 python: 3.6
 install:
-  - pip install torch
+  - pip install -q torch
   - pip install -r requirements-test.txt
   - pip install -e .
 script: pytest
