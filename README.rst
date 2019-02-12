@@ -43,9 +43,9 @@ dependencies and running the tests and linter.
 Installing dependencies
 -----------------------
 
-Make sure you setup a virtual environment with Python and PyTorch
-installed. Then, install all the dependencies in ``requirements.txt`` file and
-install this package in development mode.
+Make sure you setup a virtual environment with Python. Then, install all
+the dependencies in ``requirements.txt`` file and install this package in
+development mode.
 
 ::
 
