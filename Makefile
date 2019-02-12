@@ -1,4 +1,4 @@
-.PHONY: build upload
+.PHONY: build upload test-upload
 
 build:
 	python setup.py bdist_wheel
