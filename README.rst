@@ -3,20 +3,33 @@ pytorch-crf
 
 Conditional random field in `PyTorch <http://pytorch.org/>`_.
 
-.. image:: https://badge.fury.io/py/pytorch-crf.svg
-   :target: https://badge.fury.io/py/pytorch-crf
+.. image:: https://img.shields.io/pypi/pyversions/pytorch-crf.svg?style=flat
+   :target: https://img.shields.io/pypi/pyversions/pytorch-crf.svg?style=flat
+   :alt: Python versions
 
-.. image:: https://travis-ci.org/kmkurn/pytorch-crf.svg?branch=master
+.. image:: https://img.shields.io/pypi/v/pytorch-crf.svg?style=flat
+   :target: https://pypi.org/project/pytorch-crf
+   :alt: PyPI project
+
+.. image:: https://img.shields.io/travis/kmkurn/pytorch-crf.svg?style=flat
    :target: https://travis-ci.org/kmkurn/pytorch-crf
+   :alt: Build status
 
-.. image:: https://readthedocs.org/projects/pytorch-crf/badge/?version=stable
-   :target: https://pytorch-crf.readthedocs.io/en/stable/?badge=stable
+.. image:: https://img.shields.io/readthedocs/pytorch-crf.svg?style=flat
+   :target: https://pytorch-crf.readthedocs.io
+   :alt: Documentation status
 
-.. image:: https://coveralls.io/repos/github/kmkurn/pytorch-crf/badge.svg?branch=master
-   :target: https://coveralls.io/github/kmkurn/pytorch-crf?branch=master
+.. image:: https://img.shields.io/coveralls/github/kmkurn/pytorch-crf.svg?style=flat
+   :target: https://coveralls.io/github/kmkurn/pytorch-crf
+   :alt: Code coverage
+
+.. image:: https://img.shields.io/pypi/l/pytorch-crf.svg?style=flat
+   :target: https://choosealicense.com/licenses/mit/
+   :alt: License
 
 .. image:: https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg
    :target: http://spacemacs.org
+   :alt: Built with Spacemacs
 
 This package provides an implementation of `conditional random field
 <https://en.wikipedia.org/wiki/Conditional_random_field>`_ (CRF) in PyTorch.
