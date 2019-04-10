@@ -1,25 +1,4 @@
-attrs==17.3.0
-certifi==2018.4.16
-cffi==1.10.0
-chardet==3.0.4
-coverage==4.0.3
+-r requirements-test.txt
 flake8==3.5.0
 flake8-mypy==17.8.0
-idna==2.6
-mccabe==0.6.1
-mypy==0.550
-numpy==1.13.3
-psutil==5.4.1
-py==1.5.2
-pycodestyle==2.3.1
-pycparser==2.18
-pyflakes==1.6.0
-pytest==3.2.5
-pytest-cov==2.5.1
-python-coveralls==2.9.1
-PyYAML==3.12
-requests==2.18.4
-six==1.11.0
-torch==0.3.0.post4
-typed-ast==1.1.0
-urllib3==1.22
+yapf==0.25.0
