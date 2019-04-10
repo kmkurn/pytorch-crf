@@ -1,16 +1,10 @@
 language: python
-before_install:
-  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh
-  - bash ~/miniconda.sh -b -p $HOME/miniconda
-  - export PATH="$HOME/miniconda/bin:$PATH"
-  - conda update -y conda
-  - conda create -y -n pytorch-crf python=3.6
-  - source activate pytorch-crf
-  # explicitly specify cudatoolkit version (see https://discuss.pytorch.org/t/libcudart-so-8-0-not-found-in-travis-ci/16071/3)
-  - conda install -y -c pytorch pytorch=0.3.0 cudatoolkit=8.0
-  - export LD_LIBRARY_PATH="$HOME/miniconda/envs/pytorch-crf/lib:$LD_LIBRARY_PATH"
+python: 3.6
 install:
-  - pip install -r requirements.txt
-  - pip install .
-script: pytest --cov
-after_success: coveralls
+  - pip install -q torch
+  - pip install -r requirements-test.txt
+  - pip install -e .
+script: pytest
+after_success:
+  - pip install coveralls
+  - coveralls

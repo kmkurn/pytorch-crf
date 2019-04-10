@@ -1,0 +1,6 @@
+[style]
+based_on_style = pep8
+coalesce_brackets = True
+column_limit = 96
+split_before_first_argument = True
+split_complex_comprehension = True
