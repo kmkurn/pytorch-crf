@@ -472,7 +472,7 @@ class TestDecode:
         crf = make_crf()
         seq_length, batch_size = 3, 2
         
-        emissions = make_emissions(crf, batch_size, seq_length)
+        emissions = make_emissions(crf, seq_length, batch_size)
         # mask should be (seq_length, batch_size)
         mask = torch.autograd.Variable(torch.ByteTensor([
             [1, 1],
@@ -481,5 +481,4 @@ class TestDecode:
         ]))
 
         probs = crf.compute_log_marginal_probabilities(emissions, mask=mask)
-
         assert probs.shape == emissions.shape

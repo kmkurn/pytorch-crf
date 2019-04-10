@@ -431,6 +431,7 @@ class CRF(nn.Module):
         beta = self._compute_log_beta(emissions, mask)
         z = self._log_sum_exp(alpha[alpha.size(0)-1], 1)
         prob = alpha + beta - z.view(1, -1, 1)
+        prob = torch.exp(prob)
         return prob
 
     @staticmethod
