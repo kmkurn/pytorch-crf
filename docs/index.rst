@@ -28,6 +28,10 @@ Install with pip::
 
     pip install pytorch-crf
 
+Or, install from Github for the latest version::
+
+    pip install git+https://github.com/kmkurn/pytorch-crf#egg=pytorch_crf
+
 Getting started
 ===============
 
