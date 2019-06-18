@@ -3,8 +3,11 @@ language: python
 python:
   - 3.6
   - 3.7
+env:
+  - PYTORCH_VERSION=1.0
+  - PYTORCH_VERSION=1.1
 install:
-  - pip install -q torch
+  - pip install -q torch==$PYTORCH_VERSION
   - pip install -r requirements-test.txt
   - pip install -e .
 script: pytest
