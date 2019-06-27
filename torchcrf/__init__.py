@@ -332,3 +332,61 @@ class CRF(nn.Module):
             best_tags_list.append(best_tags)
 
         return best_tags_list
+
+    def _compute_log_alpha(self,
+                           emissions: torch.FloatTensor,
+                           mask: torch.ByteTensor,
+                           run_backwards: bool) -> torch.FloatTensor:
+        # emissions: (seq_length, batch_size, num_tags)
+        # mask: (seq_length, batch_size)
+        assert emissions.dim() == 3 and mask.dim() == 2
+        assert emissions.size()[:2] == mask.size()
+        assert emissions.size(2) == self.num_tags
+        assert all(mask[0].data)
+
+        seq_length = emissions.size(0)
+        mask = mask.float()
+        broadcast_transitions = self.transitions.unsqueeze(0)  # (1, num_tags, num_tags)
+        emissions_broadcast = emissions.unsqueeze(2)
+        seq_iterator = range(1, seq_length)
+
+        if run_backwards:
+            # running backwards, so transpose
+            broadcast_transitions = broadcast_transitions.transpose(1, 2) # (1, num_tags, num_tags)
+            emissions_broadcast = emissions_broadcast.transpose(2,3)
+
+            # the starting probability is end_transitions if running backwards
+            log_prob = [self.end_transitions.expand(emissions.size(1), -1)]
+
+            # iterate over the sequence backwards
+            seq_iterator = reversed(seq_iterator)
+        else:
+            # Start transition score and first emission
+            log_prob = [emissions[0] + self.start_transitions.view(1, -1)]
+
+        for i in seq_iterator:
+            # Broadcast log_prob over all possible next tags
+            broadcast_log_prob = log_prob[-1].unsqueeze(2)  # (batch_size, num_tags, 1)
+            # Sum current log probability, transition, and emission scores
+            score = broadcast_log_prob + broadcast_transitions + emissions_broadcast[i]  # (batch_size, num_tags, num_tags)
+            # Sum over all possible current tags, but we're in log prob space, so a sum
+            # becomes a log-sum-exp
+            score = torch.logsumexp(score, dim=1)
+            # Set log_prob to the score if this timestep is valid (mask == 1), otherwise
+            # copy the prior value
+            log_prob.append(score * mask[i].unsqueeze(1) +
+                            log_prob[-1] * (1.-mask[i]).unsqueeze(1))
+
+        if run_backwards:
+            log_prob.reverse()
+
+        return torch.stack(log_prob)
+
+    def compute_marginal_probabilities(self,
+                                       emissions: torch.FloatTensor,
+                                       mask: torch.ByteTensor) -> torch.FloatTensor:
+        alpha = self._compute_log_alpha(emissions, mask, run_backwards=False)
+        beta = self._compute_log_alpha(emissions, mask, run_backwards=True)
+        z = torch.logsumexp(alpha[alpha.size(0)-1] + self.end_transitions, dim=1)
+        prob = alpha + beta - z.view(1, -1, 1)
+        return torch.exp(prob)

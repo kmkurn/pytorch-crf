@@ -6,6 +6,7 @@ from pytest import approx
 import pytest
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pad_sequence
 
 from torchcrf import CRF
 
@@ -467,3 +468,139 @@ class TestDecode:
         with pytest.raises(ValueError) as excinfo:
             crf.decode(emissions, mask=mask)
         assert 'mask of the first timestep must all be on' in str(excinfo.value)
+
+class TestMarginalProb:
+    def test_2x2_example(self):
+        crf = make_crf(num_tags=2)
+
+        crf.transitions = torch.nn.Parameter(torch.FloatTensor([
+            [0, 10],
+            [0, 0],
+        ]))
+
+        crf.start_transitions = torch.nn.Parameter(torch.FloatTensor([
+            [0, 0],
+        ]))
+        crf.end_transitions = torch.nn.Parameter(torch.FloatTensor([
+            [0, 0],
+        ]))
+
+        emissions = torch.autograd.Variable(torch.FloatTensor([
+            [0, 1],
+            [1, 0],
+        ])).unsqueeze(1)
+
+        mask = torch.autograd.Variable(torch.ByteTensor([
+            [1],
+            [1],
+        ]))
+
+        probs = crf.compute_marginal_probabilities(emissions, mask=mask)
+
+        assert probs.shape == emissions.shape
+        assert torch.allclose(probs.sum(dim=2), torch.ones(mask.size()[0]))
+
+        expected = torch.FloatTensor(
+            [[[0.9995413946057852, 0.00045860539421477145]], [[0.00045860539421477145, 0.9995413946057852]]])
+        assert torch.allclose(probs, expected)
+
+    def test_2x3_example(self):
+        crf = make_crf(num_tags=2)
+
+        crf.transitions = torch.nn.Parameter(torch.FloatTensor([
+            [0, 10],
+            [0, 0],
+        ]))
+
+        crf.start_transitions = torch.nn.Parameter(torch.FloatTensor([
+            [0, 0],
+        ]))
+        crf.end_transitions = torch.nn.Parameter(torch.FloatTensor([
+            [0, 0],
+        ]))
+
+        emissions = torch.autograd.Variable(torch.FloatTensor([
+            [0, 1],
+            [1, 0],
+            [0, 1],
+        ])).unsqueeze(1)
+
+        mask = torch.autograd.Variable(torch.ByteTensor([
+            [1],
+            [1],
+            [1],
+        ]))
+
+        probs = crf.compute_marginal_probabilities(emissions, mask=mask)
+
+        assert probs.shape == emissions.shape
+        assert torch.allclose(probs.sum(dim=2), torch.ones(mask.size()[0]))
+
+        expected = torch.FloatTensor(
+            [
+                [[0.35607922, 0.64392078]],
+                [[0.88078587, 0.11921413]],
+                [[0.03207633, 0.96792367]]
+            ])
+        assert torch.allclose(probs, expected)
+
+    def test_multiple_batches(self):
+        crf = make_crf(num_tags=2)
+
+        crf.transitions = torch.nn.Parameter(torch.FloatTensor([
+            [0, 10],
+            [0, 0],
+        ]))
+
+        emissions = torch.autograd.Variable(torch.FloatTensor([
+            [[0, 1],[1,0]],
+            [[1, 0],[1,0]],
+            [[1, 0],[1,0]],
+            [[1, 10],[1,0]],
+            [[1, -1],[1,0]],
+        ]))
+
+        mask = torch.autograd.Variable(torch.ByteTensor([
+            [1,1],
+            [1,1],
+            [1,1],
+            [1,1],
+            [1,0],
+        ]))
+
+        probs = crf.compute_marginal_probabilities(emissions, mask=mask)
+
+        assert probs.shape == emissions.shape
+        assert torch.allclose(probs.sum(dim=2), torch.ones(mask.size()[:2]))
+
+    def test_masking(self):
+        num_tags = 5
+        crf = make_crf(num_tags=num_tags)
+
+        # generate 10 randomly sized emissions
+        random_emissions = []
+        for i in range(10):
+            timesteps = random.randint(1,20)
+            random_emissions.append(torch.randn(timesteps, num_tags))
+        emissions = pad_sequence(random_emissions)
+
+        # calculate masks
+        max_size = emissions.size(0)
+        masks = list([torch.zeros(max_size) for a in range(10)])
+        for idx, m in enumerate(masks):
+            masks[idx][:len(random_emissions[idx])] = 1
+        masks = torch.stack(masks).transpose(0,1)
+
+        # compute marginal probabilities in 1 minibatch of size 10
+        probs = crf.compute_marginal_probabilities(emissions, mask=masks)
+        assert torch.allclose(probs.sum(dim=2), torch.ones(masks.size()[:2]))
+
+        # compute marginal probabilities over 10 minibatches of size 1
+        probs_batch_first = probs.transpose(0,1)
+        for idx, e in enumerate(random_emissions):
+            probs = crf.compute_marginal_probabilities(e.unsqueeze(1), mask=torch.ones(e.size(0)).view(-1,1))
+
+            # verify that both methods give the same result
+            probs_expected = probs_batch_first[idx][:e.size(0)].unsqueeze(1)
+            assert torch.allclose(probs, probs_expected)
+
