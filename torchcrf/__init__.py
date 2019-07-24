@@ -371,7 +371,7 @@ class CRF(nn.Module):
             score = broadcast_log_prob + broadcast_transitions + emissions_broadcast[i]  # (batch_size, num_tags, num_tags)
             # Sum over all possible current tags, but we're in log prob space, so a sum
             # becomes a log-sum-exp
-            score = torch.logsumexp(score, dim=1)
+            score = self._log_sum_exp(score, dim=1)
             # Set log_prob to the score if this timestep is valid (mask == 1), otherwise
             # copy the prior value
             log_prob.append(score * mask[i].unsqueeze(1) +
@@ -390,3 +390,15 @@ class CRF(nn.Module):
         z = torch.logsumexp(alpha[alpha.size(0)-1] + self.end_transitions, dim=1)
         prob = alpha + beta - z.view(1, -1, 1)
         return torch.exp(prob)
+
+
+    @staticmethod
+    def _log_sum_exp(tensor: torch.Tensor, dim: int) -> torch.Tensor:
+        # Find the max value along `dim`
+        offset, _ = tensor.max(dim)
+        # Make offset broadcastable
+        broadcast_offset = offset.unsqueeze(dim)
+        # Perform log-sum-exp safely
+        safe_log_sum_exp = torch.log(torch.sum(torch.exp(tensor - broadcast_offset), dim))
+        # Add offset back
+        return offset + safe_log_sum_exp
