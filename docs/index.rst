@@ -8,8 +8,8 @@ pytorch-crf
 
 *Conditional random fields in PyTorch.*
 
-This package provides an implementation of a `conditional random fields (CRF)`_ layer
-in PyTorch. The implementation borrows mostly from `AllenNLP CRF module`_ with some
+This package provides an implementation of a linear-chain `conditional random fields (CRF)`_
+layer in PyTorch. The implementation borrows mostly from `AllenNLP CRF module`_ with some
 modifications.
 
 .. toctree::

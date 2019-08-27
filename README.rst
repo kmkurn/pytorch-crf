@@ -31,7 +31,7 @@ Conditional random field in `PyTorch <http://pytorch.org/>`_.
    :target: http://spacemacs.org
    :alt: Built with Spacemacs
 
-This package provides an implementation of `conditional random field
+This package provides an implementation of linear-chain `conditional random field
 <https://en.wikipedia.org/wiki/Conditional_random_field>`_ (CRF) in PyTorch.
 This implementation borrows mostly from `AllenNLP CRF module
 <https://github.com/allenai/allennlp/blob/master/allennlp/modules/conditional_ra
