@@ -101,10 +101,61 @@ class CRF(nn.Module):
             mask = mask.transpose(0, 1)
         self._validate(emissions, mask)
 
+        seq_length, batch_size = tags.shape
+        # Start transition score and first emission for both
         # shape: (batch_size,)
-        numerator = self._compute_score(emissions, tags, mask)
+        numerator = self.start_transitions[tags[0]]
+        numerator += emissions[0, torch.arange(batch_size), tags[0]]
+        denominator = self.start_transitions + emissions[0]
+
+        # Broadcast emissions
+        # shape: (seq_length, batch_size, 1, num_tags)
+        broadcast_emissions = emissions.unsqueeze(2)
+        for i in range(1, seq_length):
+            # Add transition and emission to next tag to the numerator if
+            # the next timestep is valid (mask==1)
+            # shape: (batch_size,)
+            numerator += (
+                self.transitions[tags[i - 1], tags[i]] +
+                emissions[i, torch.arange(batch_size), tags[i]]) * mask[i].float()
+
+            # Broadcast the denominator for every possible next tag
+            # shape: (batch_size, num_tags, 1)
+            broadcast_denominator = denominator.unsqueeze(2)
+
+            # Compute the score tensor of size (batch_size, num_tags, num_tags) where
+            # for each sample, entry at row i and column j stores the sum of scores of all
+            # possible tag sequences so far that end with transitioning from tag i to tag j
+            # and emitting
+            # shape: (batch_size, num_tags, num_tags)
+            next_denominator = broadcast_denominator + self.transitions + broadcast_emissions[i]
+
+            # Sum over all possible current tags, but we're in score space, so a sum
+            # becomes a log-sum-exp: for each sample, entry i stores the sum of scores of
+            # all possible tag sequences so far, that end in tag i
+            # shape: (batch_size, num_tags)
+            next_denominator = torch.logsumexp(next_denominator, dim=1)
+
+            # Set score to the next score if this timestep is valid (mask == 1)
+            # shape: (batch_size, num_tags)
+            denominator = torch.where(mask[i].unsqueeze(1), next_denominator, denominator)
+
+        # End transition score for numerator
         # shape: (batch_size,)
-        denominator = self._compute_normalizer(emissions, mask)
+        seq_ends = mask.long().sum(dim=0) - 1
+        # shape: (batch_size,)
+        last_tags = tags[seq_ends, torch.arange(batch_size)]
+        # shape: (batch_size,)
+        numerator += self.end_transitions[last_tags]
+
+        # End transition score for denominator
+        # shape: (batch_size, num_tags)
+        denominator += self.end_transitions
+        # Sum (log-sum-exp) over all possible tags
+        # shape: (batch_size,)
+        denominator = torch.logsumexp(denominator, dim=1)
+
+        # Compute log likelihood
         # shape: (batch_size,)
         llh = numerator - denominator
 
@@ -131,85 +182,6 @@ class CRF(nn.Module):
             raise ValueError('mask of the first timestep must all be on')
         if not ((torch.abs(mask[:-1].long() - mask[1:].long()).sum(dim=0)) <= 1).all():
             raise ValueError('mask must not be discontinuous')
-
-    def _compute_score(
-            self, emissions: torch.Tensor, tags: torch.LongTensor,
-            mask: torch.ByteTensor) -> torch.Tensor:
-        # emissions: (seq_length, batch_size, num_tags)
-        # tags: (seq_length, batch_size)
-        # mask: (seq_length, batch_size)
-        seq_length, batch_size = tags.shape
-        mask = mask.float()
-
-        # Start transition score and first emission
-        # shape: (batch_size,)
-        score = self.start_transitions[tags[0]]
-        score += emissions[0, torch.arange(batch_size), tags[0]]
-
-        for i in range(1, seq_length):
-            # Transition score to next tag, only added if next timestep is valid (mask == 1)
-            # shape: (batch_size,)
-            score += self.transitions[tags[i - 1], tags[i]] * mask[i]
-
-            # Emission score for next tag, only added if next timestep is valid (mask == 1)
-            # shape: (batch_size,)
-            score += emissions[i, torch.arange(batch_size), tags[i]] * mask[i]
-
-        # End transition score
-        # shape: (batch_size,)
-        seq_ends = mask.long().sum(dim=0) - 1
-        # shape: (batch_size,)
-        last_tags = tags[seq_ends, torch.arange(batch_size)]
-        # shape: (batch_size,)
-        score += self.end_transitions[last_tags]
-
-        return score
-
-    def _compute_normalizer(
-            self, emissions: torch.Tensor, mask: torch.ByteTensor) -> torch.Tensor:
-        # emissions: (seq_length, batch_size, num_tags)
-        # mask: (seq_length, batch_size)
-        seq_length = emissions.size(0)
-
-        # Start transition score and first emission; score has size of
-        # (batch_size, num_tags) where for each batch, the j-th column stores
-        # the score that the first timestep has tag j
-        # shape: (batch_size, num_tags)
-        score = self.start_transitions + emissions[0]
-
-        for i in range(1, seq_length):
-            # Broadcast score for every possible next tag
-            # shape: (batch_size, num_tags, 1)
-            broadcast_score = score.unsqueeze(2)
-
-            # Broadcast emission score for every possible current tag
-            # shape: (batch_size, 1, num_tags)
-            broadcast_emissions = emissions[i].unsqueeze(1)
-
-            # Compute the score tensor of size (batch_size, num_tags, num_tags) where
-            # for each sample, entry at row i and column j stores the sum of scores of all
-            # possible tag sequences so far that end with transitioning from tag i to tag j
-            # and emitting
-            # shape: (batch_size, num_tags, num_tags)
-            next_score = broadcast_score + self.transitions + broadcast_emissions
-
-            # Sum over all possible current tags, but we're in score space, so a sum
-            # becomes a log-sum-exp: for each sample, entry i stores the sum of scores of
-            # all possible tag sequences so far, that end in tag i
-            # shape: (batch_size, num_tags)
-            next_score = torch.logsumexp(next_score, dim=1)
-
-            # Set score to the next score if this timestep is valid (mask == 1)
-            # shape: (batch_size, num_tags)
-            score = torch.where(mask[i].unsqueeze(1), next_score, score)
-
-        # End transition score
-        # shape: (batch_size, num_tags)
-        score += self.end_transitions
-
-        # Sum (log-sum-exp) over all possible tags
-        # shape: (batch_size,)
-        return torch.logsumexp(score, dim=1)
 
     def decode(self, emissions: torch.Tensor,
                mask: Optional[torch.ByteTensor] = None) -> List[List[int]]:
