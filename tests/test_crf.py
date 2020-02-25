@@ -284,7 +284,7 @@ class TestForward:
         assert llh.item() == approx(llh_bf.item())
 
     def test_emissions_has_bad_number_of_dimension(self):
-        emissions = torch.randn(1, 2)
+        emissions = torch.randn(2, 2)
         tags = torch.empty(2, 2, dtype=torch.long)
         crf = make_crf()
 
