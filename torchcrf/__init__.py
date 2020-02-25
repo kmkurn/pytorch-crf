@@ -1,6 +1,6 @@
 __version__ = '0.7.2'
 
-from typing import List, Optional
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -183,8 +183,9 @@ class CRF(nn.Module):
         if not ((torch.abs(mask[:-1].long() - mask[1:].long()).sum(dim=0)) <= 1).all():
             raise ValueError('mask must not be discontinuous')
 
-    def decode(self, emissions: torch.Tensor,
-               mask: Optional[torch.ByteTensor] = None) -> List[List[int]]:
+    def decode(
+            self, emissions: torch.Tensor,
+            mask: Optional[torch.ByteTensor] = None) -> torch.LongTensor:
         """Find the most likely tag sequence using Viterbi algorithm.
 
         Args:
@@ -195,7 +196,10 @@ class CRF(nn.Module):
                 if ``batch_first`` is ``False``, ``(batch_size, seq_length)`` otherwise.
 
         Returns:
-            List of list containing the best tag sequence for each batch.
+            `~torch.LongTensor`: Tensor of size size ``(batch_size, seq_length)`` 
+            containing the most likely tags sequences. If a mask was specified,
+            the associated tags of each sequence are random and should be 
+            discarded.
         """
         if mask is None:
             mask = emissions.new_ones(emissions.shape[:2], dtype=torch.uint8)
@@ -204,20 +208,22 @@ class CRF(nn.Module):
             mask = mask.transpose(0, 1)
         self._validate(emissions, mask)
 
-        # emissions: (seq_length, batch_size, num_tags)
-        # mask: (seq_length, batch_size)
         seq_length, batch_size = mask.shape
+
+        # score is a tensor where for every batch, value at column j stores the score of the
+        # best tag sequence so far that ends # with tag j
+        # history saves where the best tags candidate transitioned from
 
         # Start transition and first emission
         # shape: (batch_size, num_tags)
         score = self.start_transitions + emissions[0]
-        history = []
+        indices = emissions.new_empty(batch_size, self.num_tags, dtype=torch.long)
+        history = emissions.new_empty(
+            seq_length - 1, batch_size, self.num_tags, dtype=torch.long)
 
-        # score is a tensor of size (batch_size, num_tags) where for every batch,
-        # value at column j stores the score of the best tag sequence so far that ends
-        # with tag j
-        # history saves where the best tags candidate transitioned from; this is used
-        # when we trace back the best tag sequence
+        # Broadcast emission score for every possible current tag
+        # shape: (seq_length, batch_size, 1, num_tags)
+        broadcast_emissions = emissions.unsqueeze(2)
 
         # Viterbi algorithm recursive case: we compute the score of the best tag sequence
         # for every possible next tag
@@ -226,50 +232,41 @@ class CRF(nn.Module):
             # shape: (batch_size, num_tags, 1)
             broadcast_score = score.unsqueeze(2)
 
-            # Broadcast emission score for every possible current tag
-            # shape: (batch_size, 1, num_tags)
-            broadcast_emission = emissions[i].unsqueeze(1)
-
             # Compute the score tensor of size (batch_size, num_tags, num_tags) where
             # for each sample, entry at row i and column j stores the score of the best
             # tag sequence so far that ends with transitioning from tag i to tag j and emitting
             # shape: (batch_size, num_tags, num_tags)
-            next_score = broadcast_score + self.transitions + broadcast_emission
+            next_score = broadcast_score + self.transitions + broadcast_emissions[i]
 
             # Find the maximum score over all possible current tag
             # shape: (batch_size, num_tags)
-            next_score, indices = next_score.max(dim=1)
+            next_score, next_indices = next_score.max(dim=1)
 
             # Set score to the next score if this timestep is valid (mask == 1)
             # and save the index that produces the next score
             # shape: (batch_size, num_tags)
             score = torch.where(mask[i].unsqueeze(1), next_score, score)
-            history.append(indices)
+            indices = torch.where(mask[i - 1].unsqueeze(1), next_indices, indices)
+            history[-i] = indices
 
         # End transition score
         # shape: (batch_size, num_tags)
         score += self.end_transitions
 
-        # Now, compute the best path for each sample
+        # Now, compute the best tag sequences for each sample
+        # shape: (batch_size, seq_length)
+        best_tags = emissions.new_empty(batch_size, seq_length, dtype=torch.long)
 
-        # shape: (batch_size,)
-        seq_ends = mask.long().sum(dim=0) - 1
-        best_tags_list = []
+        # Find the tag which maximizes the score at the last timestep
+        # shape: (batch_size, )
+        _, best_last_tag = score.max(dim=1)
+        best_prev_tag = best_last_tag
 
-        for idx in range(batch_size):
-            # Find the tag which maximizes the score at the last timestep; this is our best tag
-            # for the last timestep
-            _, best_last_tag = score[idx].max(dim=0)
-            best_tags = [best_last_tag.item()]
+        # Trace back where the best last tag comes from, and add to our sequences
+        for i in range(seq_length - 1):
+            best_prev_tag = history[i, torch.arange(batch_size), best_prev_tag]
+            best_tags[:, seq_length - 2 - i] = best_prev_tag
+        # Add the tag for the last timestep
+        best_tags[torch.arange(batch_size), mask.long().sum(dim=0) - 1] = best_last_tag
 
-            # We trace back where the best last tag comes from, append that to our best tag
-            # sequence, and trace it back again, and so on
-            for hist in reversed(history[:seq_ends[idx]]):
-                best_last_tag = hist[idx][best_tags[-1]]
-                best_tags.append(best_last_tag.item())
-
-            # Reverse the order because we start from the last timestep
-            best_tags.reverse()
-            best_tags_list.append(best_tags)
-
-        return best_tags_list
+        return best_tags
