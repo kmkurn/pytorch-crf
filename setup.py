@@ -27,4 +27,5 @@ setup(
     ],
     keywords='torch',
     packages=find_packages(),
+    install_requires=['torch>=1.0.0'],
     python_requires='>=3.6, <4')
