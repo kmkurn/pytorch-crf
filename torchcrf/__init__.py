@@ -137,6 +137,8 @@ class CRF(nn.Module):
                 f'got {tuple(emissions.shape[:2])} and {tuple(mask.shape)}')
         if not mask[0].all():
             raise ValueError('mask of the first timestep must all be on')
+        if not ((torch.abs(mask[: -1].long() - mask[1:].long()).sum(axis=0)) <=1).all():
+            raise ValueError('mask must not be discontinuous')
 
     def _compute_score(
             self, emissions: torch.Tensor, tags: torch.LongTensor,
