@@ -87,11 +87,11 @@ class CRF(nn.Module):
             `~torch.Tensor`: The log likelihood. This will have size ``(batch_size,)`` if
             reduction is ``none``, ``()`` otherwise.
         """
-        self._validate(emissions, tags=tags, mask=mask)
         if reduction not in ('none', 'sum', 'mean', 'token_mean'):
             raise ValueError(f'invalid reduction: {reduction}')
         if mask is None:
             mask = torch.ones_like(tags, dtype=torch.uint8)
+        self._validate(emissions, mask, tags=tags)
 
         if self.batch_first:
             emissions = emissions.transpose(0, 1)
@@ -117,8 +117,8 @@ class CRF(nn.Module):
     def _validate(
             self,
             emissions: torch.Tensor,
-            tags: Optional[torch.LongTensor] = None,
-            mask: Optional[torch.ByteTensor] = None) -> None:
+            mask: torch.ByteTensor,
+            tags: Optional[torch.LongTensor] = None) -> None:
         if emissions.dim() != 3:
             raise ValueError(f'emissions must have dimension of 3, got {emissions.dim()}')
         if emissions.size(2) != self.num_tags:
@@ -132,15 +132,14 @@ class CRF(nn.Module):
                     'the first two dimensions of emissions and tags must match, '
                     f'got {tuple(emissions.shape[:2])} and {tuple(tags.shape)}')
 
-        if mask is not None:
-            if emissions.shape[:2] != mask.shape:
-                raise ValueError(
-                    'the first two dimensions of emissions and mask must match, '
-                    f'got {tuple(emissions.shape[:2])} and {tuple(mask.shape)}')
-            no_empty_seq = not self.batch_first and mask[0].all()
-            no_empty_seq_bf = self.batch_first and mask[:, 0].all()
-            if not no_empty_seq and not no_empty_seq_bf:
-                raise ValueError('mask of the first timestep must all be on')
+        if emissions.shape[:2] != mask.shape:
+            raise ValueError(
+                'the first two dimensions of emissions and mask must match, '
+                f'got {tuple(emissions.shape[:2])} and {tuple(mask.shape)}')
+        no_empty_seq = not self.batch_first and mask[0].all()
+        no_empty_seq_bf = self.batch_first and mask[:, 0].all()
+        if not no_empty_seq and not no_empty_seq_bf:
+            raise ValueError('mask of the first timestep must all be on')
 
     def _compute_score(
             self, emissions: torch.Tensor, tags: torch.LongTensor,
@@ -184,8 +183,6 @@ class CRF(nn.Module):
             self, emissions: torch.Tensor, mask: torch.ByteTensor) -> torch.Tensor:
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
-        assert mask.dim() == 2
-        assert emissions.shape[:2] == mask.shape
         assert mask[0].all()
 
         seq_length = emissions.size(0)
@@ -244,18 +241,15 @@ class CRF(nn.Module):
         Returns:
             List of list containing the best tag sequence for each batch.
         """
-        self._validate(emissions, mask=mask)
         if mask is None:
             mask = emissions.new_ones(emissions.shape[:2], dtype=torch.uint8)
-
+        self._validate(emissions, mask)
         if self.batch_first:
             emissions = emissions.transpose(0, 1)
             mask = mask.transpose(0, 1)
 
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
-        assert mask.dim() == 2
-        assert emissions.shape[:2] == mask.shape
         assert mask[0].all()
 
         seq_length, batch_size = mask.shape
