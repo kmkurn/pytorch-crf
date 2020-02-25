@@ -91,12 +91,11 @@ class CRF(nn.Module):
             raise ValueError(f'invalid reduction: {reduction}')
         if mask is None:
             mask = torch.ones_like(tags, dtype=torch.uint8)
-        self._validate(emissions, mask, tags=tags)
-
         if self.batch_first:
             emissions = emissions.transpose(0, 1)
             tags = tags.transpose(0, 1)
             mask = mask.transpose(0, 1)
+        self._validate(emissions, mask, tags=tags)
 
         # shape: (batch_size,)
         numerator = self._compute_score(emissions, tags, mask)
@@ -136,9 +135,7 @@ class CRF(nn.Module):
             raise ValueError(
                 'the first two dimensions of emissions and mask must match, '
                 f'got {tuple(emissions.shape[:2])} and {tuple(mask.shape)}')
-        no_empty_seq = not self.batch_first and mask[0].all()
-        no_empty_seq_bf = self.batch_first and mask[:, 0].all()
-        if not no_empty_seq and not no_empty_seq_bf:
+        if not mask[0].all():
             raise ValueError('mask of the first timestep must all be on')
 
     def _compute_score(
@@ -150,7 +147,6 @@ class CRF(nn.Module):
         assert tags.dim() == 2
         assert emissions.shape[:2] == tags.shape
         assert mask.shape == tags.shape
-        assert mask[0].all()
 
         seq_length, batch_size = tags.shape
         mask = mask.float()
@@ -183,8 +179,6 @@ class CRF(nn.Module):
             self, emissions: torch.Tensor, mask: torch.ByteTensor) -> torch.Tensor:
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
-        assert mask[0].all()
-
         seq_length = emissions.size(0)
 
         # Start transition score and first emission; score has size of
@@ -243,15 +237,13 @@ class CRF(nn.Module):
         """
         if mask is None:
             mask = emissions.new_ones(emissions.shape[:2], dtype=torch.uint8)
-        self._validate(emissions, mask)
         if self.batch_first:
             emissions = emissions.transpose(0, 1)
             mask = mask.transpose(0, 1)
+        self._validate(emissions, mask)
 
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
-        assert mask[0].all()
-
         seq_length, batch_size = mask.shape
 
         # Start transition and first emission
