@@ -89,13 +89,17 @@ class CRF(nn.Module):
         """
         if reduction not in ('none', 'sum', 'mean', 'token_mean'):
             raise ValueError(f'invalid reduction: {reduction}')
+        if emissions.shape[:2] != tags.shape:
+            raise ValueError(
+                'the first two dimensions of emissions and tags must match, '
+                f'got {tuple(emissions.shape[:2])} and {tuple(tags.shape)}')
         if mask is None:
             mask = torch.ones_like(tags, dtype=torch.uint8)
         if self.batch_first:
             emissions = emissions.transpose(0, 1)
             tags = tags.transpose(0, 1)
             mask = mask.transpose(0, 1)
-        self._validate(emissions, mask, tags=tags)
+        self._validate(emissions, mask)
 
         # shape: (batch_size,)
         numerator = self._compute_score(emissions, tags, mask)
@@ -112,32 +116,20 @@ class CRF(nn.Module):
             return llh.mean()
         return llh.sum() / mask.float().sum()
 
-
-    def _validate(
-            self,
-            emissions: torch.Tensor,
-            mask: torch.ByteTensor,
-            tags: Optional[torch.LongTensor] = None) -> None:
+    def _validate(self, emissions: torch.Tensor, mask: torch.ByteTensor) -> None:
         if emissions.dim() != 3:
             raise ValueError(f'emissions must have dimension of 3, got {emissions.dim()}')
         if emissions.size(2) != self.num_tags:
             raise ValueError(
                 f'expected last dimension of emissions is {self.num_tags}, '
                 f'got {emissions.size(2)}')
-
-        if tags is not None:
-            if emissions.shape[:2] != tags.shape:
-                raise ValueError(
-                    'the first two dimensions of emissions and tags must match, '
-                    f'got {tuple(emissions.shape[:2])} and {tuple(tags.shape)}')
-
         if emissions.shape[:2] != mask.shape:
             raise ValueError(
                 'the first two dimensions of emissions and mask must match, '
                 f'got {tuple(emissions.shape[:2])} and {tuple(mask.shape)}')
         if not mask[0].all():
             raise ValueError('mask of the first timestep must all be on')
-        if not ((torch.abs(mask[: -1].long() - mask[1:].long()).sum(axis=0)) <=1).all():
+        if not ((torch.abs(mask[:-1].long() - mask[1:].long()).sum(dim=0)) <= 1).all():
             raise ValueError('mask must not be discontinuous')
 
     def _compute_score(
@@ -146,10 +138,6 @@ class CRF(nn.Module):
         # emissions: (seq_length, batch_size, num_tags)
         # tags: (seq_length, batch_size)
         # mask: (seq_length, batch_size)
-        assert tags.dim() == 2
-        assert emissions.shape[:2] == tags.shape
-        assert mask.shape == tags.shape
-
         seq_length, batch_size = tags.shape
         mask = mask.float()
 
