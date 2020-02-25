@@ -114,29 +114,6 @@ class CRF(nn.Module):
         assert reduction == 'token_mean'
         return llh.sum() / mask.float().sum()
 
-    def decode(self, emissions: torch.Tensor,
-               mask: Optional[torch.ByteTensor] = None) -> List[List[int]]:
-        """Find the most likely tag sequence using Viterbi algorithm.
-
-        Args:
-            emissions (`~torch.Tensor`): Emission score tensor of size
-                ``(seq_length, batch_size, num_tags)`` if ``batch_first`` is ``False``,
-                ``(batch_size, seq_length, num_tags)`` otherwise.
-            mask (`~torch.ByteTensor`): Mask tensor of size ``(seq_length, batch_size)``
-                if ``batch_first`` is ``False``, ``(batch_size, seq_length)`` otherwise.
-
-        Returns:
-            List of list containing the best tag sequence for each batch.
-        """
-        self._validate(emissions, mask=mask)
-        if mask is None:
-            mask = emissions.new_ones(emissions.shape[:2], dtype=torch.uint8)
-
-        if self.batch_first:
-            emissions = emissions.transpose(0, 1)
-            mask = mask.transpose(0, 1)
-
-        return self._viterbi_decode(emissions, mask)
 
     def _validate(
             self,
@@ -256,8 +233,28 @@ class CRF(nn.Module):
         # shape: (batch_size,)
         return torch.logsumexp(score, dim=1)
 
-    def _viterbi_decode(self, emissions: torch.FloatTensor,
-                        mask: torch.ByteTensor) -> List[List[int]]:
+    def decode(self, emissions: torch.Tensor,
+               mask: Optional[torch.ByteTensor] = None) -> List[List[int]]:
+        """Find the most likely tag sequence using Viterbi algorithm.
+
+        Args:
+            emissions (`~torch.Tensor`): Emission score tensor of size
+                ``(seq_length, batch_size, num_tags)`` if ``batch_first`` is ``False``,
+                ``(batch_size, seq_length, num_tags)`` otherwise.
+            mask (`~torch.ByteTensor`): Mask tensor of size ``(seq_length, batch_size)``
+                if ``batch_first`` is ``False``, ``(batch_size, seq_length)`` otherwise.
+
+        Returns:
+            List of list containing the best tag sequence for each batch.
+        """
+        self._validate(emissions, mask=mask)
+        if mask is None:
+            mask = emissions.new_ones(emissions.shape[:2], dtype=torch.uint8)
+
+        if self.batch_first:
+            emissions = emissions.transpose(0, 1)
+            mask = mask.transpose(0, 1)
+
         # emissions: (seq_length, batch_size, num_tags)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and mask.dim() == 2
