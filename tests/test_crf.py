@@ -360,8 +360,8 @@ class TestDecode:
 
         # Compute best tag manually
         for emission, best_tag, mask_ in zip(emissions, best_tags, mask):
+            best_tag = best_tag[mask_].tolist()
             seq_len = mask_.sum()
-            assert len(best_tag) == seq_len
             assert all(isinstance(t, int) for t in best_tag)
             emission = emission[:seq_len]
             manual_best_tag = max(
@@ -374,10 +374,10 @@ class TestDecode:
         # shape: (seq_length, batch_size, num_tags)
         emissions = make_emissions(crf)
 
-        best_tags_no_mask = crf.decode(emissions)
+        best_tags_no_mask = crf.decode(emissions).tolist()
         # No mask means mask is all ones
         best_tags_mask = crf.decode(
-            emissions, mask=emissions.new_ones(emissions.shape[:2]).byte())
+            emissions, mask=emissions.new_ones(emissions.shape[:2]).byte()).tolist()
 
         assert best_tags_no_mask == best_tags_mask
 
@@ -389,19 +389,17 @@ class TestDecode:
         emissions = make_emissions(crf, seq_length, batch_size)
         # shape: (seq_length, batch_size)
         mask = torch.tensor([[1, 1, 1], [1, 1, 0]], dtype=torch.uint8).transpose(0, 1)
-
         batched = crf.decode(emissions, mask=mask)
-
+        batched = [b[mask[:, i]].tolist() for i, b in enumerate(batched)]
         non_batched = []
         for i in range(batch_size):
             # shape: (seq_length, 1, num_tags)
             emissions_ = emissions[:, i, :].unsqueeze(1)
             # shape: (seq_length, 1)
             mask_ = mask[:, i].unsqueeze(1)
-
             result = crf.decode(emissions_, mask=mask_)
             assert len(result) == 1
-            non_batched.append(result[0])
+            non_batched.append(result[0, mask_[:, 0]].tolist())
 
         assert non_batched == batched
 
@@ -409,7 +407,7 @@ class TestDecode:
         crf = make_crf()
         # shape: (seq_length, batch_size, num_tags)
         emissions = make_emissions(crf)
-        best_tags = crf.decode(emissions)
+        best_tags = crf.decode(emissions).tolist()
 
         crf_bf = make_crf(batch_first=True)
         # Copy parameter values from non-batch-first CRF; requires_grad must be False
@@ -420,7 +418,7 @@ class TestDecode:
 
         # shape: (batch_size, seq_length, num_tags)
         emissions = emissions.transpose(0, 1)
-        best_tags_bf = crf_bf.decode(emissions)
+        best_tags_bf = crf_bf.decode(emissions).tolist()
 
         assert best_tags == best_tags_bf
 
