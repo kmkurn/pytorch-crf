@@ -340,6 +340,16 @@ class TestForward:
             crf(emissions, tags, reduction='foo')
         assert 'invalid reduction: foo' in str(excinfo.value)
 
+    def test_discontinuous_mask(self):
+        emissions = torch.randn(4, 2, 4)
+        tags = torch.empty(4, 2, dtype=torch.long)
+        mask = torch.tensor([[1, 1, 1, 1], [1, 0, 1, 0]], dtype=torch.uint8).transpose(0, 1)
+        crf = make_crf(4)
+
+        with pytest.raises(ValueError) as excinfo:
+            crf(emissions, tags, mask=mask)
+        assert 'mask must not be discontinuous' in str(excinfo.value)
+
 
 class TestDecode:
     def test_works_with_mask(self):
@@ -465,3 +475,12 @@ class TestDecode:
         with pytest.raises(ValueError) as excinfo:
             crf.decode(emissions, mask=mask)
         assert 'mask of the first timestep must all be on' in str(excinfo.value)
+
+    def test_discontinuous_mask(self):
+        emissions = torch.randn(4, 2, 4)
+        mask = torch.tensor([[1, 1, 1, 1], [1, 0, 1, 0]], dtype=torch.uint8).transpose(0, 1)
+        crf = make_crf(4)
+
+        with pytest.raises(ValueError) as excinfo:
+            crf.decode(emissions, mask=mask)
+        assert 'mask must not be discontinuous' in str(excinfo.value)
