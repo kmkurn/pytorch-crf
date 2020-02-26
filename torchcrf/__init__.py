@@ -102,23 +102,30 @@ class CRF(nn.Module):
         self._validate(emissions, mask)
 
         seq_length, batch_size = tags.shape
-        # Start transition score and first emission for both
+
+        # Start transition score and first emission
         # shape: (batch_size,)
         numerator = self.start_transitions[tags[0]]
         numerator += emissions[0, torch.arange(batch_size), tags[0]]
-        denominator = self.start_transitions + emissions[0]
+        # Transition score and emission to next tag, only added if next timestep is valid
+        # shape: (batch_size,)
+        numerator += ((
+            emissions[torch.arange(1, seq_length).view(-1, 1).repeat(1, batch_size),
+                      torch.arange(batch_size).repeat(seq_length - 1, 1), tags[1:]] +
+            self.transitions[tags[:-1], tags[1:]]) * mask[1:].float()).sum(dim=0)
+        # End transition score
+        # shape: (batch_size,)
+        seq_ends = mask.long().sum(dim=0) - 1
+        last_tags = tags[seq_ends, torch.arange(batch_size)]
+        numerator += self.end_transitions[last_tags]
 
+        # Start transition score and first emission
+        # shape: (batch_size,)
+        denominator = self.start_transitions + emissions[0]
         # Broadcast emissions
         # shape: (seq_length, batch_size, 1, num_tags)
         broadcast_emissions = emissions.unsqueeze(2)
         for i in range(1, seq_length):
-            # Add transition and emission to next tag to the numerator if
-            # the next timestep is valid (mask==1)
-            # shape: (batch_size,)
-            numerator += (
-                self.transitions[tags[i - 1], tags[i]] +
-                emissions[i, torch.arange(batch_size), tags[i]]) * mask[i].float()
-
             # Broadcast the denominator for every possible next tag
             # shape: (batch_size, num_tags, 1)
             broadcast_denominator = denominator.unsqueeze(2)
@@ -139,14 +146,6 @@ class CRF(nn.Module):
             # Set score to the next score if this timestep is valid (mask == 1)
             # shape: (batch_size, num_tags)
             denominator = torch.where(mask[i].unsqueeze(1), next_denominator, denominator)
-
-        # End transition score for numerator
-        # shape: (batch_size,)
-        seq_ends = mask.long().sum(dim=0) - 1
-        # shape: (batch_size,)
-        last_tags = tags[seq_ends, torch.arange(batch_size)]
-        # shape: (batch_size,)
-        numerator += self.end_transitions[last_tags]
 
         # End transition score for denominator
         # shape: (batch_size, num_tags)
