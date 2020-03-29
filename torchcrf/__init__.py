@@ -112,7 +112,7 @@ class CRF(nn.Module):
         if reduction == 'mean':
             return llh.mean()
         assert reduction == 'token_mean'
-        return llh.sum() / mask.float().sum()
+        return llh.sum() / mask.type_as(emissions).sum()
 
     def decode(self, emissions: torch.Tensor,
                mask: Optional[torch.ByteTensor] = None) -> List[List[int]]:
@@ -179,7 +179,7 @@ class CRF(nn.Module):
         assert mask[0].all()
 
         seq_length, batch_size = tags.shape
-        mask = mask.float()
+        mask = mask.type_as(emissions)
 
         # Start transition score and first emission
         # shape: (batch_size,)
