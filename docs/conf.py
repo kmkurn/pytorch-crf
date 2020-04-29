@@ -14,10 +14,9 @@
 
 from pathlib import Path
 import sys
+import re
 sys.path.insert(0, Path('..').resolve())
 
-from pathlib import Path
-import re
 
 here = Path(__file__).resolve().parent
 __version__ = re.search(
