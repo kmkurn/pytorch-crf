@@ -1,6 +1,6 @@
 __version__ = '0.7.2'
 
-from typing import List, Optional
+from typing import List, Optional, Union, Tuple
 
 import torch
 import torch.nn as nn
@@ -17,6 +17,14 @@ class CRF(nn.Module):
     Args:
         num_tags: Number of tags.
         batch_first: Whether the first dimension corresponds to the size of a minibatch.
+        score_reduction: reduces how the score output over batches, and then
+                         tags, and how output is returned in :meth:`decode` by:
+          - **skip**: do not return scores, only the decoded output (default)
+          - **none**: return the scores unaltered, then divide by the batch count
+          - **sum**: sum the max over batches, then divide by the batch count
+          - **max**: max over each batch max, then divide by the batch count
+          - **min**: min over each batch max, then divide by the batch count
+          - **mean**: average the max over batchs, then divide by the batch count
 
     Attributes:
         start_transitions (`~torch.nn.Parameter`): Start transition score tensor of size
@@ -33,14 +41,17 @@ class CRF(nn.Module):
        Learning*. Morgan Kaufmann. pp. 282–289.
 
     .. _Viterbi algorithm: https://en.wikipedia.org/wiki/Viterbi_algorithm
+
     """
 
-    def __init__(self, num_tags: int, batch_first: bool = False) -> None:
+    def __init__(self, num_tags: int, batch_first: bool = False,
+                 score_reduction: str = 'skip') -> None:
         if num_tags <= 0:
             raise ValueError(f'invalid number of tags: {num_tags}')
         super().__init__()
         self.num_tags = num_tags
         self.batch_first = batch_first
+        self.score_reduction = score_reduction
         self.start_transitions = nn.Parameter(torch.empty(num_tags))
         self.end_transitions = nn.Parameter(torch.empty(num_tags))
         self.transitions = nn.Parameter(torch.empty(num_tags, num_tags))
@@ -115,7 +126,8 @@ class CRF(nn.Module):
         return llh.sum() / mask.type_as(emissions).sum()
 
     def decode(self, emissions: torch.Tensor,
-               mask: Optional[torch.ByteTensor] = None) -> List[List[int]]:
+               mask: Optional[torch.ByteTensor] = None) -> \
+               Union[List[List[int]], Tuple[List[List[int]], torch.Tensor]]:
         """Find the most likely tag sequence using Viterbi algorithm.
 
         Args:
@@ -126,7 +138,10 @@ class CRF(nn.Module):
                 if ``batch_first`` is ``False``, ``(batch_size, seq_length)`` otherwise.
 
         Returns:
-            List of list containing the best tag sequence for each batch.
+            List of list containing the best tag sequence for each batch and
+            optionally the scores based on the (~`score_reduction`) parameter
+            in :meth:`__init__`.
+
         """
         self._validate(emissions, mask=mask)
         if mask is None:
@@ -331,4 +346,14 @@ class CRF(nn.Module):
             best_tags.reverse()
             best_tags_list.append(best_tags)
 
-        return best_tags_list
+        if self.score_reduction == 'skip':
+            return best_tags_list
+        else:
+            if score != 'none':
+                score = score.max(dim=1)[0]
+                score = {'sum': score.sum(),
+                         'max': score.max(),
+                         'min': score.min(),
+                         'mean': score.mean()}[self.score_reduction]
+                score = score / batch_size
+            return best_tags_list, score
