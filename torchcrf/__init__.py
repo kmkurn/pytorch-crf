@@ -349,7 +349,7 @@ class CRF(nn.Module):
         if self.score_reduction == 'skip':
             return best_tags_list
         else:
-            if score != 'none':
+            if self.score_reduction != 'none':
                 score = score.max(dim=1)[0]
                 score = {'sum': score.sum(),
                          'max': score.max(),
