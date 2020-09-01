@@ -1,4 +1,4 @@
-__version__ = '0.7.2'
+__version__ = '0.7.3'
 
 from typing import List, Optional, Union, Tuple
 
@@ -17,10 +17,15 @@ class CRF(nn.Module):
     Args:
         num_tags: Number of tags.
         batch_first: Whether the first dimension corresponds to the size of a minibatch.
+
         score_reduction: reduces how the score output over batches, and then
-                         tags, and how output is returned in :meth:`decode` by:
+                         tags, and has shape ``(batch size, number of tags)``
+                         with the exception of ``tags``, which has shape
+                         ``(batch_size, sequence length, number of tags)``; how
+                         output is returned in :meth:`decode` by:
           - **skip**: do not return scores, only the decoded output (default)
           - **none**: return the scores unaltered, then divide by the batch count
+          - **tags**: all scores 
           - **sum**: sum the max over batches, then divide by the batch count
           - **max**: max over each batch max, then divide by the batch count
           - **min**: min over each batch max, then divide by the batch count
@@ -287,6 +292,14 @@ class CRF(nn.Module):
         score = self.start_transitions + emissions[0]
         history = []
 
+        # Keep the scores to later return if the user wants them them based on
+        # the score reduction, which will have shape:
+        # (batch_size, seq_len, num_tags)
+        if self.score_reduction == 'tags':
+            tag_scores = []
+        else:
+            tag_scores = None
+
         # score is a tensor of size (batch_size, num_tags) where for every batch,
         # value at column j stores the score of the best tag sequence so far that ends
         # with tag j
@@ -318,11 +331,22 @@ class CRF(nn.Module):
             # and save the index that produces the next score
             # shape: (batch_size, num_tags)
             score = torch.where(mask[i].unsqueeze(1), next_score, score)
+
+            # Add scores to cat them later based on the score reduction
+            # shape: (batch_size, num_tags)
+            if tag_scores is not None:
+                tag_scores.append(score.detach().unsqueeze(1))
+
             history.append(indices)
 
         # End transition score
         # shape: (batch_size, num_tags)
         score += self.end_transitions
+
+        # Add the final transition score to our returned scores
+        # shape: (batch_size, num_tags)
+        if tag_scores is not None:
+            tag_scores.append(score.detach().unsqueeze(1))
 
         # Now, compute the best path for each sample
 
@@ -346,10 +370,14 @@ class CRF(nn.Module):
             best_tags.reverse()
             best_tags_list.append(best_tags)
 
+        # If the user wants scores, return them in the desired format
         if self.score_reduction == 'skip':
             return best_tags_list
         else:
-            if self.score_reduction != 'none':
+            if self.score_reduction == 'tags':
+                # shape: (batch_size, seq_length, num_tags)
+                score = torch.cat(tag_scores, 1)
+            elif self.score_reduction != 'none':
                 score = score.max(dim=1)[0]
                 score = {'sum': score.sum(),
                          'max': score.max(),
