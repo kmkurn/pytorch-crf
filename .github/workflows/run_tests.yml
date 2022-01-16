@@ -1,4 +1,4 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# This workflow will install Python dependencies, run tests, and update test coverage
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
 name: run-tests
@@ -34,8 +34,8 @@ jobs:
         python -m pip install -e .
     - name: Test with pytest
       run: pytest
-    - name: Upload test coverage
+    - name: Coveralls
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
       if: ${{ success() }}$
-      run: |
-        python -m pip install coveralls
-        coveralls
