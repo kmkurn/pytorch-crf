@@ -11,8 +11,8 @@ Conditional random field in `PyTorch <http://pytorch.org/>`_.
    :target: https://pypi.org/project/pytorch-crf
    :alt: PyPI project
 
-.. image:: https://img.shields.io/travis/kmkurn/pytorch-crf.svg?style=flat
-   :target: https://travis-ci.org/kmkurn/pytorch-crf
+.. image:: https://github.com/kmkurn/pytorch-crf/actions/workflows/run_tests.yml/badge.svg
+   :target: https://github.com/kmkurn/pytorch-crf/actions/workflows/run_tests.yml
    :alt: Build status
 
 .. image:: https://img.shields.io/readthedocs/pytorch-crf.svg?style=flat
