@@ -10,6 +10,6 @@ jobs:
     steps:
       - uses: actions/stale@v4
         with:
-          days-before-stale: 180  # 6 months
-          days-before-close: 270  # 9 months
+          days-before-stale: 90  # 3 months
+          days-before-close: 180  # 6 months
           debug-only: true
