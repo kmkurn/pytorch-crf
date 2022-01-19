@@ -13,3 +13,5 @@ jobs:
         with:
           days-before-stale: 90  # 3 months
           days-before-close: 180  # 6 months
+          operations-per-run: 60
+          debug-only: true
