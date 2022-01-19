@@ -1,8 +1,9 @@
 name: 'Mark and maybe close stale issues and PRs'
 
-on: workflow_dispatch
-#  schedule:
-#    - cron: '30 1 * * *'
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 1 * * *'
     
 jobs:
   stale:
@@ -12,4 +13,3 @@ jobs:
         with:
           days-before-stale: 90  # 3 months
           days-before-close: 180  # 6 months
-          debug-only: true
