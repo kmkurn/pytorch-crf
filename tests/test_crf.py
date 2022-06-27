@@ -34,8 +34,12 @@ def compute_score(crf, emission, tag):
     return score
 
 
-def make_crf(num_tags=5, batch_first=False):
+def make_crf(num_tags=5, batch_first=False, script=False):
     return CRF(num_tags, batch_first=batch_first)
+
+
+def script_crf(crf):
+    return torch.jit.script(crf)
 
 
 def make_emissions(crf, seq_length=3, batch_size=2):
@@ -84,6 +88,7 @@ class TestInit:
 class TestForward:
     def test_works_with_mask(self):
         crf = make_crf()
+        crf_script = script_crf(crf)
         seq_length, batch_size = 3, 2
 
         # shape: (seq_length, batch_size, num_tags)
@@ -95,6 +100,8 @@ class TestForward:
 
         # shape: ()
         llh = crf(emissions, tags, mask=mask)
+        llh_scripted = crf_script(emissions, tags, mask=mask)
+        assert torch.equal(llh, llh_scripted)
 
         # shape: (batch_size, seq_length, num_tags)
         emissions = emissions.transpose(0, 1)
@@ -121,19 +128,29 @@ class TestForward:
 
     def test_works_without_mask(self):
         crf = make_crf()
+        crf_script = script_crf(crf)
         # shape: (seq_length, batch_size, num_tags)
         emissions = make_emissions(crf)
         # shape: (seq_length, batch_size)
         tags = make_tags(crf)
 
         llh_no_mask = crf(emissions, tags)
+        llh_no_mask_script = crf_script(emissions, tags)
+        assert llh_no_mask.item() == llh_no_mask_script.item(
+        ), " scripted crf forward res not matching with crf forward res"
         # No mask means the mask is all ones
         llh_mask = crf(emissions, tags, mask=torch.ones_like(tags).byte())
+        llh_mask_script = crf_script(emissions, tags, mask=torch.ones_like(tags).byte())
+        assert torch.equal(
+            llh_mask,
+            llh_mask_script), " scripted crf forward res not matching with crf forward res"
 
         assert llh_no_mask.item() == approx(llh_mask.item())
 
     def test_batched_loss(self):
         crf = make_crf()
+        crf_script = script_crf(crf)
+
         batch_size = 10
 
         # shape: (seq_length, batch_size, num_tags)
@@ -142,6 +159,8 @@ class TestForward:
         tags = make_tags(crf, batch_size=batch_size)
 
         llh = crf(emissions, tags)
+        llh_script = crf_script(emissions, tags)
+        assert torch.equal(llh_script, llh), " llh script matching llh not scripted"
         assert torch.is_tensor(llh)
         assert llh.shape == ()
 
@@ -158,6 +177,8 @@ class TestForward:
 
     def test_reduction_none(self):
         crf = make_crf()
+        crf_script = script_crf(crf)
+
         # shape: (seq_length, batch_size, num_tags)
         emissions = make_emissions(crf)
         # shape: (seq_length, batch_size)
@@ -166,6 +187,8 @@ class TestForward:
         seq_length, batch_size = tags.shape
 
         llh = crf(emissions, tags, reduction='none')
+        llh_script = crf_script(emissions, tags, reduction='none')
+        assert torch.equal(llh_script, llh), "scripted output not matching non-scripted out"
 
         assert torch.is_tensor(llh)
         assert llh.shape == (batch_size, )
@@ -191,6 +214,8 @@ class TestForward:
 
     def test_reduction_mean(self):
         crf = make_crf()
+        crf_script = script_crf(crf)
+
         # shape: (seq_length, batch_size, num_tags)
         emissions = make_emissions(crf)
         # shape: (seq_length, batch_size)
@@ -199,6 +224,8 @@ class TestForward:
         seq_length, batch_size = tags.shape
 
         llh = crf(emissions, tags, reduction='mean')
+        llh_script = crf_script(emissions, tags, reduction='mean')
+        assert torch.equal(llh_script, llh), "scripted output not matching non-scripted out"
 
         assert torch.is_tensor(llh)
         assert llh.shape == ()
@@ -223,6 +250,8 @@ class TestForward:
 
     def test_reduction_token_mean(self):
         crf = make_crf()
+        crf_script = script_crf(crf)
+
         seq_length, batch_size = 3, 2
 
         # shape: (seq_length, batch_size, num_tags)
@@ -233,6 +262,8 @@ class TestForward:
         mask = torch.tensor([[1, 1, 1], [1, 1, 0]], dtype=torch.uint8).transpose(0, 1)
 
         llh = crf(emissions, tags, mask=mask, reduction='token_mean')
+        llh_script = crf_script(emissions, tags, mask=mask, reduction='token_mean')
+        assert torch.equal(llh_script, llh), "scripted output not matching non-scripted out"
 
         assert torch.is_tensor(llh)
         assert llh.shape == ()
@@ -262,11 +293,14 @@ class TestForward:
 
     def test_batch_first(self):
         crf = make_crf()
+        crf_script = script_crf(crf)
         # shape: (seq_length, batch_size, num_tags)
         emissions = make_emissions(crf)
         # shape: (seq_length, batch_size)
         tags = make_tags(crf)
         llh = crf(emissions, tags)
+        llh_script = crf_script(emissions, tags)
+        assert torch.equal(llh_script, llh), "scripted output not matching non-scripted out"
 
         crf_bf = make_crf(batch_first=True)
         # Copy parameter values from non-batch-first CRF; requires_grad must be False
@@ -275,11 +309,16 @@ class TestForward:
         crf_bf.end_transitions.requires_grad_(False).copy_(crf.end_transitions)
         crf_bf.transitions.requires_grad_(False).copy_(crf.transitions)
 
+        crf_bf_script = script_crf(crf_bf)
+
         # shape: (batch_size, seq_length, num_tags)
         emissions = emissions.transpose(0, 1)
         # shape: (batch_size, seq_length)
         tags = tags.transpose(0, 1)
         llh_bf = crf_bf(emissions, tags)
+        llh_bf_script = crf_bf_script(emissions, tags)
+        assert torch.equal(
+            llh_bf_script, llh_bf), "scripted output not matching non-scripted out"
 
         assert llh.item() == approx(llh_bf.item())
 
@@ -333,6 +372,7 @@ class TestForward:
 
     def test_invalid_reduction(self):
         crf = make_crf()
+
         emissions = make_emissions(crf)
         tags = make_tags(crf)
 
@@ -344,14 +384,17 @@ class TestForward:
 class TestDecode:
     def test_works_with_mask(self):
         crf = make_crf()
+        crf_script = script_crf(crf)
+
         seq_length, batch_size = 3, 2
 
         # shape: (seq_length, batch_size, num_tags)
         emissions = make_emissions(crf, seq_length, batch_size)
         # mask should be (seq_length, batch_size)
         mask = torch.tensor([[1, 1, 1], [1, 1, 0]], dtype=torch.uint8).transpose(0, 1)
-
         best_tags = crf.decode(emissions, mask=mask)
+        best_tags_scripted = crf_script.decode(emissions, mask=mask)
+        assert best_tags == best_tags_scripted, f"scripted decode output {best_tags_scripted} doesn't match non-scripted output {best_tags}"
 
         # shape: (batch_size, seq_length, num_tags)
         emissions = emissions.transpose(0, 1)
@@ -371,18 +414,30 @@ class TestDecode:
 
     def test_works_without_mask(self):
         crf = make_crf()
+        crf_script = script_crf(crf)
+
         # shape: (seq_length, batch_size, num_tags)
         emissions = make_emissions(crf)
 
         best_tags_no_mask = crf.decode(emissions)
+        best_tags_no_mask_scripted = crf_script.decode(emissions)
+        assert best_tags_no_mask == best_tags_no_mask_scripted, f"scripted decode output {best_tags_no_mask_scripted} doesn't match non-scripted output {best_tags_no_mask}"
+
         # No mask means mask is all ones
         best_tags_mask = crf.decode(
             emissions, mask=emissions.new_ones(emissions.shape[:2]).byte())
+
+        best_tags_mask_scripted = crf_script.decode(
+            emissions, mask=emissions.new_ones(emissions.shape[:2]).byte())
+
+        assert best_tags_mask == best_tags_mask_scripted, f"scripted decode output {best_tags_mask_scripted} doesn't match non-scripted output {best_tags_mask}"
 
         assert best_tags_no_mask == best_tags_mask
 
     def test_batched_decode(self):
         crf = make_crf()
+        crf_script = script_crf(crf)
+
         batch_size, seq_length = 2, 3
 
         # shape: (seq_length, batch_size, num_tags)
@@ -391,6 +446,8 @@ class TestDecode:
         mask = torch.tensor([[1, 1, 1], [1, 1, 0]], dtype=torch.uint8).transpose(0, 1)
 
         batched = crf.decode(emissions, mask=mask)
+        batched_scripted = crf_script.decode(emissions, mask=mask)
+        assert batched == batched_scripted, f"scripted decode output {batched_scripted} doesn't match non-scripted output {batched}"
 
         non_batched = []
         for i in range(batch_size):
@@ -400,6 +457,8 @@ class TestDecode:
             mask_ = mask[:, i].unsqueeze(1)
 
             result = crf.decode(emissions_, mask=mask_)
+            result_scripted = crf_script.decode(emissions_, mask=mask_)
+            assert result == result_scripted, f"scripted decode output {result_scripted} doesn't match non-scripted output {result}"
             assert len(result) == 1
             non_batched.append(result[0])
 
@@ -407,9 +466,13 @@ class TestDecode:
 
     def test_batch_first(self):
         crf = make_crf()
+        crf_script = script_crf(crf)
+
         # shape: (seq_length, batch_size, num_tags)
         emissions = make_emissions(crf)
         best_tags = crf.decode(emissions)
+        best_tags_scripted = crf_script.decode(emissions)
+        assert best_tags == best_tags_scripted, f"scripted decode output {best_tags_scripted} doesn't match non-scripted decode output {best_tags}"
 
         crf_bf = make_crf(batch_first=True)
         # Copy parameter values from non-batch-first CRF; requires_grad must be False
@@ -418,9 +481,13 @@ class TestDecode:
         crf_bf.end_transitions.requires_grad_(False).copy_(crf.end_transitions)
         crf_bf.transitions.requires_grad_(False).copy_(crf.transitions)
 
+        crf_bf_script = script_crf(crf_bf)
+
         # shape: (batch_size, seq_length, num_tags)
         emissions = emissions.transpose(0, 1)
         best_tags_bf = crf_bf.decode(emissions)
+        best_tags_bf_script = crf_bf_script.decode(emissions)
+        assert best_tags_bf == best_tags_bf_script, f"scripted decode output {best_tags_bf_script} doesn't match non-scripted decode output {best_tags_bf}"
 
         assert best_tags == best_tags_bf
 
