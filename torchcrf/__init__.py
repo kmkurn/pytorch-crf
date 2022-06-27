@@ -313,7 +313,7 @@ class CRF(nn.Module):
         score += self.end_transitions
 
         # Now, compute the best path for each sample
-        # # shape: (batch_size,)
+        # shape: (batch_size,)
         seq_ends = mask.long().sum(dim=0) - 1
         best_tags_list: List[List[int]] = []
         for idx in range(batch_size):
