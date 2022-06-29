@@ -92,6 +92,7 @@ class CRF(nn.Module):
             raise ValueError(f'invalid reduction: {reduction}')
         if mask is None:
             mask = torch.ones_like(tags, dtype=torch.uint8)
+            mask = mask.cuda() if next(self.parameters()).is_cuda else mask
 
         if self.batch_first:
             emissions = emissions.transpose(0, 1)
