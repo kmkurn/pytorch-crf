@@ -19,7 +19,7 @@ Minimal requirements
 ====================
 
 * Python 3.6
-* PyTorch 1.0.0
+* PyTorch 1.2.0
 
 Installation
 ============
