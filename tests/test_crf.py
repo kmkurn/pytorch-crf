@@ -300,8 +300,7 @@ class TestForward:
         with pytest.raises(ValueError) as excinfo:
             crf(emissions, tags)
         assert (
-            'the first two dimensions of emissions and tags must match, '
-            'got (1, 2) and (2, 2)') in str(excinfo.value)
+            'the first dimension of emissions and tags must match, got 1 and 2') in str(excinfo.value)
 
     def test_emissions_last_dimension_not_equal_to_number_of_tags(self):
         emissions = torch.randn(1, 2, 3)
@@ -448,8 +447,7 @@ class TestDecode:
         with pytest.raises(ValueError) as excinfo:
             crf.decode(emissions, mask=mask)
         assert (
-            'the first two dimensions of emissions and mask must match, '
-            'got (1, 2) and (2, 2)') in str(excinfo.value)
+            'number of time steps is different in emissions and mask, got 1 and 2') in str(excinfo.value)
 
     def test_first_timestep_mask_is_not_all_on(self):
         emissions = torch.randn(3, 2, 4)
@@ -467,3 +465,9 @@ class TestDecode:
         with pytest.raises(ValueError) as excinfo:
             crf.decode(emissions, mask=mask)
         assert 'mask of the first timestep must all be on' in str(excinfo.value)
+
+class TestTorchScript:
+    def test_torch_scriptable(self):
+        crf = make_crf()
+        scripted_module = torch.jit.script(crf)
+        assert hasattr(scripted_module, 'decode')
