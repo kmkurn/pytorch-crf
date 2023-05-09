@@ -476,3 +476,184 @@ else:
 
     def assert_close(actual, expected):
         torch.testing.assert_allclose(actual, expected, atol=1e-12, rtol=1e-6)
+
+
+# TODO: reduce duplicated code below, maybe with pytest.mark.parametrize
+@pytest.mark.skipif(
+    Version(torch.__version__) < Version("1.10.0"),
+    reason="torch version does not support torch script")
+class TestTorchScriptForward:
+    def test_torch_scriptable(self):
+        crf = make_crf()
+        scripted_module = torch.jit.script(crf)
+        assert hasattr(scripted_module, 'decode')
+
+    def test_default_forward(self):
+        # Test default case
+        crf = make_crf()
+        crf_script = torch.jit.script(crf)
+        seq_length, batch_size = 3, 2
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(crf, seq_length, batch_size)
+        # shape: (seq_length, batch_size)
+        tags = make_tags(crf, seq_length, batch_size)
+        # mask should have size of (seq_length, batch_size)
+        mask = torch.tensor([[1, 1, 1], [1, 1, 0]], dtype=torch.uint8).transpose(0, 1)
+        llh = crf(emissions, tags, mask=mask)
+        llh_scripted = crf_script(emissions, tags, mask=mask)
+        assert_close(llh_scripted, llh)
+
+    def test_without_mask(self):
+        crf = make_crf()
+        crf_script = torch.jit.script(crf)
+        seq_length, batch_size = 3, 2
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(crf, seq_length, batch_size)
+        # shape: (seq_length, batch_size)
+        tags = make_tags(crf, seq_length, batch_size)
+        # Test scripted forward works without mask
+        llh_no_mask = crf(emissions, tags)
+        llh_no_mask_script = crf_script(emissions, tags)
+        assert_close(llh_no_mask_script, llh_no_mask)
+
+    def test_all_ones_mask(self):
+        crf = make_crf()
+        crf_script = torch.jit.script(crf)
+        seq_length, batch_size = 3, 2
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(crf, seq_length, batch_size)
+        # shape: (seq_length, batch_size)
+        tags = make_tags(crf, seq_length, batch_size)
+
+        # No mask means the mask is all ones
+        llh_mask = crf(emissions, tags, mask=torch.ones_like(tags).byte())
+        llh_mask_script = crf_script(emissions, tags, mask=torch.ones_like(tags).byte())
+        assert_close(llh_mask_script, llh_mask)
+
+    def test_batched_forward(self):
+        crf = make_crf()
+        crf_script = torch.jit.script(crf)
+
+        # Test scripted forward in batched setting
+        batch_size = 10
+        # shape: (seq_length, batch_size, num_tags)
+        emissions_batch = make_emissions(crf, batch_size=batch_size)
+        # shape: (seq_length, batch_size)
+        tags_batch = make_tags(crf, batch_size=batch_size)
+        llh = crf(emissions_batch, tags_batch)
+        llh_script = crf_script(emissions_batch, tags_batch)
+        assert_close(llh_script, llh)
+
+    def test_reduction_none(self):
+        crf = make_crf()
+        crf_script = torch.jit.script(crf)
+
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(crf)
+        # shape: (seq_length, batch_size)
+        tags = make_tags(crf)
+        llh = crf(emissions, tags, reduction='none')
+        llh_script = crf_script(emissions, tags, reduction='none')
+        assert_close(llh_script, llh)
+
+    def test_reduction_mean(self):
+        crf = make_crf()
+        crf_script = torch.jit.script(crf)
+
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(crf)
+        # shape: (seq_length, batch_size)
+        tags = make_tags(crf)
+
+        llh = crf(emissions, tags, reduction='mean')
+        llh_script = crf_script(emissions, tags, reduction='mean')
+        assert_close(llh_script, llh)
+
+    def test_reduction_token_mean(self):
+        crf = make_crf()
+        crf_script = torch.jit.script(crf)
+
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(crf)
+        # shape: (seq_length, batch_size)
+        tags = make_tags(crf)
+
+        mask = torch.tensor([[1, 1, 1], [1, 1, 0]], dtype=torch.uint8).transpose(0, 1)
+        llh = crf(emissions, tags, mask=mask, reduction='token_mean')
+        llh_script = crf_script(emissions, tags, mask=mask, reduction='token_mean')
+        assert_close(llh_script, llh)
+
+    def test_batch_first(self):
+        crf = make_crf()
+
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(crf)
+        # shape: (seq_length, batch_size)
+        tags = make_tags(crf)
+
+        # Test scripted forward when running batch first mode
+        crf_bf = make_crf(batch_first=True)
+        # Copy parameter values from non-batch-first CRF; requires_grad must be False
+        # to avoid runtime error of in-place operation on a leaf variable
+        crf_bf.start_transitions.requires_grad_(False).copy_(crf.start_transitions)
+        crf_bf.end_transitions.requires_grad_(False).copy_(crf.end_transitions)
+        crf_bf.transitions.requires_grad_(False).copy_(crf.transitions)
+        crf_bf_script = torch.jit.script(crf_bf)
+        emissions = emissions.transpose(0, 1)
+        # shape: (batch_size, seq_length)
+        tags = tags.transpose(0, 1)
+        llh_bf = crf_bf(emissions, tags)
+        llh_bf_script = crf_bf_script(emissions, tags)
+        assert_close(llh_bf_script, llh_bf)
+
+
+@pytest.mark.skipif(
+    Version(torch.__version__) < Version("1.10.0"),
+    reason="torch version does not support torch script")
+class TestTorchScriptDecode:
+    def test_with_mask(self):
+        # Test decoding with a mask
+        crf = make_crf()
+        crf_script = torch.jit.script(crf)
+
+        seq_length, batch_size = 3, 2
+        # shape: (seq_length, batch_size, num_tags)
+        emissions = make_emissions(crf, seq_length, batch_size)
+        # mask should be (seq_length, batch_size)
+        mask = torch.tensor([[1, 1, 1], [1, 1, 0]], dtype=torch.uint8).transpose(0, 1)
+        best_tags = crf.decode(emissions, mask=mask)
+        best_tags_scripted = crf_script.decode(emissions, mask=mask)
+        assert best_tags == best_tags_scripted
+
+    def test_without_mask(self):
+        crf = make_crf()
+        crf_script = torch.jit.script(crf)
+
+        seq_length, batch_size = 3, 2
+        # shape: (seq_length, batch_size, num_tags)
+
+        emissions = make_emissions(crf, seq_length, batch_size)
+        best_tags_no_mask = crf.decode(emissions)
+        best_tags_no_mask_scripted = crf_script.decode(emissions)
+        assert best_tags_no_mask == best_tags_no_mask_scripted
+
+    def test_batch_first(self):
+        crf = make_crf()
+
+        seq_length, batch_size = 3, 2
+        # shape: (seq_length, batch_size, num_tags)
+
+        emissions = make_emissions(crf, seq_length, batch_size)
+
+        crf_bf = make_crf(batch_first=True)
+        # Copy parameter values from non-batch-first CRF; requires_grad must be False
+        # to avoid runtime error of in-place operation on a leaf variable
+        crf_bf.start_transitions.requires_grad_(False).copy_(crf.start_transitions)
+        crf_bf.end_transitions.requires_grad_(False).copy_(crf.end_transitions)
+        crf_bf.transitions.requires_grad_(False).copy_(crf.transitions)
+        crf_bf_script = torch.jit.script(crf_bf)
+        # shape: (batch_size, seq_length, num_tags)
+        emissions = emissions.transpose(0, 1)
+        best_tags_bf = crf_bf.decode(emissions)
+        best_tags_bf_script = crf_bf_script.decode(emissions)
+        assert best_tags_bf == best_tags_bf_script

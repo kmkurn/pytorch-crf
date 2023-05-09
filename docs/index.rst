@@ -92,6 +92,17 @@ To obtain the most probable sequence of tags, use the `CRF.decode` method.
 
 This method also accepts a mask tensor, see `CRF.decode` for details.
 
+TorchScript
+-----------
+
+The ``CRF`` module is compatible with TorchScript on PyTorch ``>=1.10.0``.
+To get a ``torch.jit.ScriptModule``, wrap a ``CRF`` instance inside ``torch.jit.script``.
+
+.. code-block:: python
+
+   script_model = torch.jit.script(CRF(num_tags))
+
+
 API documentation
 =================
 
