@@ -1,6 +1,6 @@
 # This only installs PyTorch with a specific CUDA version which may not be
 # compatible with yours. If so, install PyTorch with the correct CUDA version
 # as instructed on https://pytorch.org/get-started/locally/
-torch
+torch>=1.10.0
 pytest==3.2.5
 pytest-cov==2.5.1

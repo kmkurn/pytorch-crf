@@ -82,3 +82,8 @@ Running linter
 
 Run ``flake8`` in the project root directory. This will also run ``mypy``,
 thanks to ``flake8-mypy`` package.
+
+TorchScript
+-----------
+
+The ``CRF`` module is compatible with TorchScript on PyTorch ``>=1.10.0``.

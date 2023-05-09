@@ -114,7 +114,9 @@ class CRF(nn.Module):
         assert reduction == 'token_mean'
         return llh.sum() / mask.type_as(emissions).sum()
 
-    def decode(self, emissions: torch.Tensor,
+    @torch.jit.export
+    def decode(self,
+               emissions: torch.Tensor,
                mask: Optional[torch.ByteTensor] = None) -> List[List[int]]:
         """Find the most likely tag sequence using Viterbi algorithm.
 
@@ -151,16 +153,18 @@ class CRF(nn.Module):
                 f'got {emissions.size(2)}')
 
         if tags is not None:
-            if emissions.shape[:2] != tags.shape:
+            if emissions.shape[0] != tags.shape[0] or emissions.shape[1] != tags.shape[1]:
                 raise ValueError(
                     'the first two dimensions of emissions and tags must match, '
-                    f'got {tuple(emissions.shape[:2])} and {tuple(tags.shape)}')
+                    f'got {(emissions.shape[0], emissions.shape[1])} and {(tags.shape[0], tags.shape[1])}'
+                )
 
         if mask is not None:
-            if emissions.shape[:2] != mask.shape:
+            if emissions.shape[0] != mask.shape[0] or emissions.shape[1] != mask.shape[1]:
                 raise ValueError(
                     'the first two dimensions of emissions and mask must match, '
-                    f'got {tuple(emissions.shape[:2])} and {tuple(mask.shape)}')
+                    f'got {(emissions.shape[0], emissions.shape[1])} and {(mask.shape[0], mask.shape[1])}'
+                )
             no_empty_seq = not self.batch_first and mask[0].all()
             no_empty_seq_bf = self.batch_first and mask[:, 0].all()
             if not no_empty_seq and not no_empty_seq_bf:
@@ -173,7 +177,7 @@ class CRF(nn.Module):
         # tags: (seq_length, batch_size)
         # mask: (seq_length, batch_size)
         assert emissions.dim() == 3 and tags.dim() == 2
-        assert emissions.shape[:2] == tags.shape
+        assert emissions.shape[0] == mask.shape[0] and emissions.shape[1] == mask.shape[1]
         assert emissions.size(2) == self.num_tags
         assert mask.shape == tags.shape
         assert mask[0].all()
@@ -270,7 +274,7 @@ class CRF(nn.Module):
         # Start transition and first emission
         # shape: (batch_size, num_tags)
         score = self.start_transitions + emissions[0]
-        history = []
+        history: List[torch.Tensor] = []
 
         # score is a tensor of size (batch_size, num_tags) where for every batch,
         # value at column j stores the score of the best tag sequence so far that ends
@@ -313,17 +317,18 @@ class CRF(nn.Module):
 
         # shape: (batch_size,)
         seq_ends = mask.long().sum(dim=0) - 1
-        best_tags_list = []
+        best_tags_list: List[List[int]] = []
 
         for idx in range(batch_size):
             # Find the tag which maximizes the score at the last timestep; this is our best tag
             # for the last timestep
             _, best_last_tag = score[idx].max(dim=0)
-            best_tags = [best_last_tag.item()]
+            best_tags: List[int] = []
+            best_tags.append(best_last_tag.item())
 
             # We trace back where the best last tag comes from, append that to our best tag
             # sequence, and trace it back again, and so on
-            for hist in reversed(history[:seq_ends[idx]]):
+            for hist in history[:seq_ends[idx]][::-1]:
                 best_last_tag = hist[idx][best_tags[-1]]
                 best_tags.append(best_last_tag.item())
 
