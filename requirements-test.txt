@@ -2,5 +2,5 @@
 # compatible with yours. If so, install PyTorch with the correct CUDA version
 # as instructed on https://pytorch.org/get-started/locally/
 torch
-pytest==3.2.5
-pytest-cov==2.5.1
+pytest>=8,<9
+pytest-cov>=2,<3
