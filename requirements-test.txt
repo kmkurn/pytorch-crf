@@ -4,3 +4,4 @@
 torch
 pytest>=8,<9
 pytest-cov>=2,<3
+packaging
